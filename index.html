@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feels Like — what the air actually feels like</title>
+  <meta name="description" content="A weather app about the only number that matters: what it actually feels like outside.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23b5490f' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23b5490f'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body data-mood="mild">
+
+  <header class="masthead">
+    <div class="wordmark">
+      <h1>Feels&nbsp;Like<span class="wordmark-deg">°</span></h1>
+      <p class="tagline">the only number that matters is the one your skin reports</p>
+    </div>
+    <button id="unitToggle" class="unit-toggle" type="button" aria-label="Switch temperature units">
+      <span data-unit="F">°F</span><span class="unit-slash">/</span><span data-unit="C">°C</span>
+    </button>
+  </header>
+
+  <div class="controls">
+    <div class="search" role="search">
+      <input id="searchInput" type="text" placeholder="city or ZIP code"
+             autocomplete="off" spellcheck="false" aria-label="Search for a city or ZIP code">
+      <ul id="suggestions" class="suggestions" hidden></ul>
+    </div>
+    <button id="compareBtn" class="compare-btn" type="button">+ compare</button>
+  </div>
+
+  <nav id="favorites" class="favorites" aria-label="Favorite places"></nav>
+
+  <main id="panels" class="panels" aria-live="polite"></main>
+
+  <footer class="colophon">
+    <details class="explainer">
+      <summary>how this number works</summary>
+      <div class="explainer-body">
+        <p>Your skin doesn't feel air temperature — it feels how fast heat is leaving
+        (or entering) your body. So the big number starts with air temperature and
+        adjusts it for the things that actually change that rate:</p>
+        <p><strong>mugginess.</strong> Built on <em>dew point</em>, not relative humidity.
+        Relative humidity lies — 100% humidity at 50° is pleasant. Dew point maps
+        directly to how sticky the air feels: above 65° is muggy anywhere on Earth,
+        above 72° is oppressive. The penalty grows steeply as dew point climbs, which is
+        why 91° in Mississippi and 91° in New Mexico get very different numbers here.</p>
+        <p><strong>dry air.</strong> When dew point is low, sweat evaporates instantly
+        and shade genuinely works. Dry heat gets a small credit.</p>
+        <p><strong>sun.</strong> Direct summer sun can add more than ten degrees of
+        perceived heat, and almost no app accounts for it. We scale this from measured
+        solar radiation, so clouds and low sun angles reduce it naturally.</p>
+        <p><strong>wind.</strong> Below 60° we use the NWS wind chill model. In warm
+        weather, moving air helps most when the air is dry enough for sweat to work.</p>
+        <p><strong>damp cold.</strong> Humid cold air pulls heat out of you faster than
+        dry cold. Raw, drizzly 40° gets marked down.</p>
+        <p>The ledger under the big number shows every adjustment, so you can argue
+        with it. All the constants live in <code>js/feelslike.js</code>.</p>
+      </div>
+    </details>
+    <p class="credit">weather data by <a href="https://open-meteo.com/" rel="noopener">open-meteo</a> · built to disagree with your thermometer</p>
+  </footer>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
