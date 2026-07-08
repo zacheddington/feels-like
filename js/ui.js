@@ -121,7 +121,17 @@ function currentFeel(data) {
 
 /* ---------- panel pieces ---------- */
 
-function heroHTML(data, unit) {
+function ageLine(entry) {
+  if (!entry.fetchedAt) return '';
+  const mins = Math.round((Date.now() - entry.fetchedAt) / 60000);
+  const when = mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} hr ago`;
+  return entry.data && entry.data._fromCache
+    ? `<span class="age stale">offline — showing data from ${when}</span>`
+    : `<span class="age">updated ${when}</span>`;
+}
+
+function heroHTML(entry, unit) {
+  const data = entry.data;
   const c = data.current;
   const feel = currentFeel(data);
   return `
@@ -134,6 +144,7 @@ function heroHTML(data, unit) {
       <span class="cond">${glyph(c.weather_code, c.is_day)}<span>${condLabel(c.weather_code)}</span></span>
       <span class="air-line">thermometer says <strong>${t(c.temperature_2m, unit)}°</strong></span>
       <span class="meta">dew point ${t(c.dew_point_2m, unit)}° · humidity ${Math.round(c.relative_humidity_2m)}% · wind ${windFmt(c.wind_speed_10m, unit)}</span>
+      ${ageLine(entry)}
     </div>
   </div>`;
 }
@@ -273,8 +284,9 @@ function panelHTML(entry, state, slot) {
     body = `<p class="panel-note err">${esc(message || 'the weather service is not answering')} — try again in a moment</p>`;
   } else if (data) {
     body = `
-      ${heroHTML(data, state.unit)}
+      ${heroHTML(entry, state.unit)}
       ${ledgerHTML(data, state.unit)}
+      <button class="fb-trigger" data-action="feedback" data-slot="${slot}">disagree with this number?</button>
       <section class="block">
         <h3 class="block-title">the next 24 hours</h3>
         ${chartSVG(data, state.unit)}
@@ -356,12 +368,15 @@ export function renderAll(state) {
   }
   panelsEl.classList.toggle('compare', panels.length === 2);
 
-  // Favorites bar
+  // Favorites bar (+ backup link — localStorage is evictable, esp. iOS PWAs)
   const favEl = document.getElementById('favorites');
   favEl.innerHTML = state.favorites.map((f, i) => `
     <button class="chip" data-action="chip" data-idx="${i}">
       ${esc(f.name)}${f.region ? `<span class="chip-region"> ${esc(f.region)}</span>` : ''}
-    </button>`).join('');
+    </button>`).join('')
+    + (state.favorites.length ? `
+    <button class="chip chip-backup" data-action="backup"
+      title="copies a link that restores these favorites on any device">backup</button>` : '');
   favEl.hidden = !state.favorites.length;
 
   // Unit toggle

@@ -12,7 +12,7 @@
 // BUMP VERSION ON EVERY RELEASE (see CLAUDE.md "Releasing"): it retires the
 // old cache on activate.
 
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.3.0';
 const CACHE = `feelslike-${VERSION}`;
 
 const SHELL = [
@@ -30,8 +30,10 @@ const SHELL = [
   './js/mock.js',
   './js/storage.js',
   './js/changelog.js',
+  './js/feedback.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './icons/icon-mono.png',
   './icons/apple-touch-icon.png',
 ];
 
@@ -57,7 +59,12 @@ async function networkFirst(request) {
     return fresh;
   } catch (err) {
     const hit = await cache.match(request, { ignoreSearch: request.mode === 'navigate' });
-    if (hit) return hit;
+    if (hit) {
+      // Flag the fallback so the app can label the data as offline/stale
+      const headers = new Headers(hit.headers);
+      headers.set('X-Feels-Like-Cache', 'fallback');
+      return new Response(hit.body, { status: hit.status, statusText: hit.statusText, headers });
+    }
     if (request.mode === 'navigate') {
       const shell = await cache.match('./index.html');
       if (shell) return shell;

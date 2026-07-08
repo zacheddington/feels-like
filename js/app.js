@@ -4,6 +4,7 @@ import { searchPlaces, reverseName, fetchWeather } from './api.js';
 import * as store from './storage.js';
 import { renderAll, renderSuggestions } from './ui.js';
 import { openExplainer, initExplainer } from './explain.js';
+import { openFeedback, initFeedback } from './feedback.js';
 import { SCENARIOS } from './mock.js';
 
 const state = {
@@ -21,18 +22,50 @@ const render = () => renderAll(state);
 
 /* ---------- loading panels ---------- */
 
-async function loadPanel(slot, loc) {
-  state.panels[slot] = { loc, status: 'loading' };
-  render();
+async function loadPanel(slot, loc, opts = {}) {
+  const prev = state.panels[slot];
+  // Silent refreshes keep the old data on screen instead of flashing a loader
+  if (!opts.silent || !prev || prev.status !== 'ready') {
+    state.panels[slot] = { loc, status: 'loading' };
+    render();
+  }
   try {
     const data = await fetchWeather(loc);
-    state.panels[slot] = { loc, data, status: 'ready' };
+    state.panels[slot] = { loc, data, status: 'ready', fetchedAt: Date.now() };
   } catch (err) {
-    state.panels[slot] = { loc, status: 'error', message: err.message };
+    if (opts.silent && prev && prev.status === 'ready') {
+      state.panels[slot] = prev; // keep last data; the age label says the rest
+    } else {
+      state.panels[slot] = { loc, status: 'error', message: err.message };
+    }
   }
   store.setActive(state.panels.filter(Boolean).map((p) => p.loc));
   render();
 }
+
+/* ---------- freshness ---------- */
+
+const REFRESH_EVERY_MS = 15 * 60 * 1000;  // periodic re-fetch while open
+const RESUME_STALE_MS = 5 * 60 * 1000;    // re-fetch on resume if older than this
+
+function refreshPanels() {
+  state.panels.forEach((p, i) => {
+    if (p && p.loc && p.status !== 'loading') loadPanel(i, p.loc, { silent: true });
+  });
+}
+
+// A PWA resumed from the background can be hours stale — refresh on resume.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  const ages = state.panels.filter(Boolean).map((p) => p.fetchedAt || 0);
+  if (ages.length && Date.now() - Math.min(...ages) > RESUME_STALE_MS) refreshPanels();
+});
+
+setInterval(() => { if (!document.hidden) refreshPanels(); }, REFRESH_EVERY_MS);
+// Keep the "updated N min ago" labels honest between refreshes
+setInterval(() => {
+  if (!document.hidden && state.panels.some((p) => p && p.status === 'ready')) render();
+}, 60 * 1000);
 
 function removePanel(slot) {
   state.panels.splice(slot, 1);
@@ -155,9 +188,22 @@ document.addEventListener('click', (e) => {
     case 'remove': removePanel(slot); break;
     case 'compare': toggleCompareSearch(); break;
     case 'explain': openExplainer(el.dataset.modal); break;
+    case 'feedback': openFeedback(state.panels[slot], state.unit); break;
+    case 'backup': copyBackupLink(el); break;
     case 'geolocate': geolocate(); break;
   }
 });
+
+function copyBackupLink(btn) {
+  const payload = encodeURIComponent(btoa(JSON.stringify({ f: state.favorites, u: state.unit })));
+  const url = `${location.origin}${location.pathname}?restore=${payload}`;
+  const done = () => { btn.textContent = 'link copied — save it somewhere'; setTimeout(render, 2000); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, () => window.prompt('copy this link:', url));
+  } else {
+    window.prompt('copy this link:', url);
+  }
+}
 
 function toggleCompareSearch() {
   if (state.searchTarget === 1) {
@@ -187,7 +233,27 @@ if ('serviceWorker' in navigator) {
 
 function init() {
   initExplainer();
+  initFeedback();
   const params = new URLSearchParams(location.search);
+
+  // ?restore=<payload> — favorites backup link (see copyBackupLink)
+  const restore = params.get('restore');
+  if (restore) {
+    try {
+      const saved = JSON.parse(atob(restore));
+      const have = new Set(state.favorites.map(store.locKey));
+      for (const f of saved.f || []) {
+        if (f && f.lat != null && !have.has(store.locKey(f))) state.favorites.push(f);
+      }
+      store.setFavorites(state.favorites);
+      if (saved.u === 'C' || saved.u === 'F') {
+        state.unit = saved.u;
+        store.setUnit(saved.u);
+      }
+    } catch { /* malformed link — ignore */ }
+    history.replaceState(null, '', location.pathname);
+  }
+
   const mock = params.get('mock');
   if (mock) {
     mock.split(',').slice(0, 2).forEach((m, i) => {

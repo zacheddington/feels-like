@@ -37,6 +37,7 @@ wind, and damp cold, with a visible breakdown ledger. Hosted on GitHub Pages.
 | `js/mock.js` | Synthetic weather scenarios for offline testing / theme previews |
 | `js/storage.js` | localStorage wrapper (`feelslike:unit`, `feelslike:favorites`, `feelslike:active`) |
 | `changelog.html` + `js/changelog.js` | Version history page: GitHub tags become headings, commit messages become entries |
+| `js/feedback.js` | "Disagree with this number?" loop: conditions snapshot + user's felt temp → Google Form (or email fallback until configured) |
 | `manifest.webmanifest` + `sw.js` + `icons/` | PWA layer: installable, offline-capable (network-first shell, cached last weather) |
 | `tools/audit-contrast.mjs` | Accessibility gate: sweeps every sky × weather × mood palette against the contrast floors |
 | `tools/make-icons.mjs` | Regenerates the PNG icons from code (`node tools/make-icons.mjs`) |
@@ -205,6 +206,46 @@ Releasing is therefore just git hygiene:
    tag appear on the page under "next / not yet released", so don't leave
    `main` untagged for long.
 
+## Data freshness
+
+Weather is fetched per panel on load and then kept fresh automatically:
+silent re-fetch (no loading flash — `loadPanel(slot, loc, { silent: true })`)
+on `visibilitychange` resume when data is >5 min old, plus every 15 min while
+visible. The hero shows "updated N min ago" (re-rendered every 60s). When the
+service worker serves a cached API response offline it sets an
+`X-Feels-Like-Cache: fallback` header; api.js turns that into
+`data._fromCache` and the UI labels it "offline — showing data from N min
+ago". If a silent refresh fails, the old data stays and its age label keeps
+counting — never blank a panel that has data.
+
+## The feedback loop (js/feedback.js)
+
+Users can tap "disagree with this number?" under the ledger and enter what it
+feels like to them. The submission carries a full conditions snapshot (air,
+dew point, humidity, wind, radiation, weather code, our value, theirs, place,
+local time) — labeled data for tuning TUNING.
+
+**Wiring the Google Form** (currently NOT configured; submissions fall back
+to a pre-filled email draft to FALLBACK_EMAIL):
+1. Create a Google Form with three "short answer" questions: felt, ours,
+   snapshot.
+2. Get a pre-filled link (⋮ → Get pre-filled link), fill dummy values, copy
+   the generated URL. It contains `entry.NNNNNNN=` ids for each question.
+3. In js/feedback.js set `FEEDBACK_FORM.action` to
+   `https://docs.google.com/forms/d/e/<form-id>/formResponse` (replace
+   `/viewform` with `/formResponse`) and map the three entry ids.
+4. Responses land in the linked Sheet. To analyze: File → Share → publish the
+   sheet as CSV, then regress `feltF − oursF` against the snapshot components
+   to see which TUNING constant is off. Don't hand-tune on vibes; wait for
+   enough rows.
+
+## Favorites backup
+
+localStorage is evictable (especially iOS home-screen apps after disuse).
+The "backup" chip in the favorites bar copies a `?restore=<base64>` link
+encoding favorites + unit; opening it on any device merges them in and cleans
+the URL (see `init()` in app.js).
+
 ## PWA notes
 
 - The app is installable (Add to Home Screen) and works offline: `sw.js`
@@ -217,6 +258,10 @@ Releasing is therefore just git hygiene:
 - Icon changes: edit `tools/make-icons.mjs` and re-run it; never hand-edit
   the PNGs. After changing icons or manifest, users must remove and re-add
   the home-screen icon to see the change.
+- The icon set includes `icon-mono.png` (white glyph on transparency) served
+  with manifest purpose `"monochrome"` for Android themed icons. iOS tinted
+  home screens auto-tint the regular icon — no web API exists to supply
+  explicit variants there, so keep the glyph a single bold shape.
 
 ## Common tasks
 

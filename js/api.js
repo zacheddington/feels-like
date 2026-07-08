@@ -141,7 +141,12 @@ export async function fetchWeather(loc) {
     + `&current=${CURRENT_VARS}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}`
     + `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`
     + `&timezone=auto&forecast_days=7`;
-  return normalize(await getJSON(url));
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!res.ok) throw new Error(`request failed (${res.status})`);
+  const data = normalize(await res.json());
+  // Set by the service worker when this response came from cache (offline)
+  data._fromCache = res.headers.get('X-Feels-Like-Cache') === 'fallback';
+  return data;
 }
 
 function normalize(data) {
