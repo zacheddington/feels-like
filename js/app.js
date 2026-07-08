@@ -3,6 +3,7 @@
 import { searchPlaces, reverseName, fetchWeather } from './api.js';
 import * as store from './storage.js';
 import { renderAll, renderSuggestions } from './ui.js';
+import { openExplainer, initExplainer } from './explain.js';
 import { SCENARIOS } from './mock.js';
 
 const state = {
@@ -80,25 +81,30 @@ input.addEventListener('input', () => {
   debounceTimer = setTimeout(runSearch, 280);
 });
 
-input.addEventListener('keydown', async (e) => {
+input.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
     if (!state.suggestions.length) return;
     const dir = e.key === 'ArrowDown' ? 1 : -1;
     state.selIdx = (state.selIdx + dir + state.suggestions.length) % state.suggestions.length;
     renderSuggestions(state);
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    clearTimeout(debounceTimer);
-    if (state.selIdx >= 0 && state.suggestions[state.selIdx]) {
-      pick(state.suggestions[state.selIdx]);
-    } else {
-      await runSearch();
-      if (state.suggestions[0]) pick(state.suggestions[0]);
-    }
   } else if (e.key === 'Escape') {
     state.suggestions = [];
     renderSuggestions(state);
+  }
+});
+
+// Pressing Enter, tapping the mobile keyboard's search key, or clicking the
+// magnifier all land here: take the highlighted suggestion, or run the
+// search and take its top result.
+document.getElementById('searchForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearTimeout(debounceTimer);
+  if (state.selIdx >= 0 && state.suggestions[state.selIdx]) {
+    pick(state.suggestions[state.selIdx]);
+  } else {
+    await runSearch();
+    if (state.suggestions[0]) pick(state.suggestions[0]);
   }
 });
 
@@ -147,9 +153,23 @@ document.addEventListener('click', (e) => {
     case 'chip': state.searchTarget = 0; loadPanel(0, state.favorites[+el.dataset.idx]); break;
     case 'fav': toggleFavorite(state.panels[slot].loc); break;
     case 'remove': removePanel(slot); break;
+    case 'compare': toggleCompareSearch(); break;
+    case 'explain': openExplainer(el.dataset.modal); break;
     case 'geolocate': geolocate(); break;
   }
 });
+
+function toggleCompareSearch() {
+  if (state.searchTarget === 1) {
+    state.searchTarget = 0;   // cancel pending compare search
+    resetSearch();
+  } else {
+    state.searchTarget = 1;
+    input.placeholder = 'compare with…';
+    input.focus();
+  }
+  render();
+}
 
 document.getElementById('unitToggle').addEventListener('click', () => {
   state.unit = state.unit === 'F' ? 'C' : 'F';
@@ -157,25 +177,10 @@ document.getElementById('unitToggle').addEventListener('click', () => {
   render();
 });
 
-document.getElementById('compareBtn').addEventListener('click', () => {
-  const panels = state.panels.filter(Boolean);
-  if (panels.length === 2) {
-    removePanel(1);
-  } else if (state.searchTarget === 1) {
-    state.searchTarget = 0;   // cancel pending compare search
-    resetSearch();
-    render();
-  } else {
-    state.searchTarget = 1;
-    input.placeholder = 'compare with…';
-    input.focus();
-    render();
-  }
-});
-
 /* ---------- boot ---------- */
 
 function init() {
+  initExplainer();
   const params = new URLSearchParams(location.search);
   const mock = params.get('mock');
   if (mock) {
@@ -183,7 +188,11 @@ function init() {
       const s = SCENARIOS[m.trim()];
       if (!s) return;
       const [name, region] = s.place.split(', ');
-      loadPanel(i, { name, region: region || '', lat: 0, lon: 0, mock: m.trim(), night: params.has('night') });
+      loadPanel(i, {
+        name, region: region || '', lat: 0, lon: 0, mock: m.trim(),
+        night: params.has('night'),
+        hour: params.get('hour') != null ? +params.get('hour') : undefined,
+      });
     });
     return;
   }

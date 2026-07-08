@@ -41,8 +41,11 @@ const US_STATES = {
   wv: 'west virginia', wi: 'wisconsin', wy: 'wyoming', dc: 'district of columbia',
 };
 
-async function geocode(name) {
-  const j = await getJSON(`${GEOCODE}?name=${encodeURIComponent(name)}&count=6&language=en&format=json`);
+const STATE_NAMES = Object.fromEntries(Object.entries(US_STATES).map(([abbr, name]) =>
+  [abbr.toUpperCase(), name.replace(/\b\w/g, (c) => c.toUpperCase())]));
+
+async function geocode(name, count = 6) {
+  const j = await getJSON(`${GEOCODE}?name=${encodeURIComponent(name)}&count=${count}&language=en&format=json`);
   return (j.results || []).map(r => ({
     name: r.name,
     region: r.admin1 || '',
@@ -72,7 +75,8 @@ export async function searchPlaces(query) {
       if (!p) return [];
       return [{
         name: p['place name'],
-        region: p['state abbreviation'] || '',
+        // Full state name, matching how the geocoder presents results
+        region: STATE_NAMES[p['state abbreviation']] || p['state abbreviation'] || '',
         country: 'US',
         lat: +p.latitude,
         lon: +p.longitude,
@@ -98,13 +102,16 @@ export async function searchPlaces(query) {
   }
   if (!name || !qualifier) return [];
 
-  results = await geocode(name);
+  // Fetch a deep result set: the geocoder ranks by population, so a small
+  // town like Madison, MS never appears in the top handful of "Madison"s.
+  // The qualifier filter is what surfaces it.
+  results = await geocode(name, 100);
   const target = (US_STATES[qualifier.toLowerCase()] || qualifier).toLowerCase();
   const matches = results.filter((r) =>
     r.region.toLowerCase().startsWith(target) ||
     r.country.toLowerCase() === qualifier.toLowerCase()
   );
-  return matches.length ? matches : results;
+  return (matches.length ? matches : results).slice(0, 6);
 }
 
 /** Best-effort place name for coordinates (used after browser geolocation). */
@@ -128,7 +135,7 @@ export async function reverseName(lat, lon) {
  *  - current.shortwave_radiation is always taken from hourly (not a current variable)
  */
 export async function fetchWeather(loc) {
-  if (loc.mock) return mockWeather(loc.mock, !!loc.night);
+  if (loc.mock) return mockWeather(loc.mock, { night: !!loc.night, hour: loc.hour });
 
   const url = `${FORECAST}?latitude=${loc.lat}&longitude=${loc.lon}`
     + `&current=${CURRENT_VARS}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}`

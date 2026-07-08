@@ -1,70 +1,25 @@
 /* =============================================================
    Feels Like — stylesheet
-   The theme is weather-reactive: body[data-mood] (+ [data-night])
-   selects a palette by setting CSS custom properties. Everything
-   else reads only the variables, never raw colors.
+   The palette is computed by js/theme.js (the "sky clock"): the
+   background follows the sun at the searched location, weather
+   lays a tint over it, and text colors are derived from the final
+   background. theme.js sets the variables inline on <html>, which
+   overrides the static fallback below. Everything in this file
+   reads only the variables, never raw colors.
 
-   Palette contract (every mood must define all of these):
+   Palette contract (theme.js must always set all of these):
      --bg      page background
      --ink     primary text
      --muted   secondary text
      --line    hairline rules & borders
-     --accent  the mood's one accent color
+     --accent  temperature-mood accent color
      --haze    translucent tint for the atmospheric wash
    ============================================================= */
 
-/* ---------- mood palettes: day ---------- */
-
-body[data-mood="dry-heat"] {
-  --bg: #e5d1a8; --ink: #402d18; --muted: #8d7350;
-  --line: #c9b17e; --accent: #b5490f; --haze: rgba(216, 140, 56, 0.30);
-}
-body[data-mood="humid-heat"] {
-  --bg: #dde0c8; --ink: #2c3524; --muted: #6d7a5e;
-  --line: #bcc29e; --accent: #55742e; --haze: rgba(158, 178, 108, 0.40);
-}
-body[data-mood="warm"] {
-  --bg: #f1e9d7; --ink: #3a342a; --muted: #8f8468;
-  --line: #d8cdae; --accent: #c07f1f; --haze: rgba(228, 178, 92, 0.28);
-}
-body[data-mood="mild"] {
+:root {
+  /* Fallback only (a mild day) — live values come from js/theme.js */
   --bg: #e9ebe2; --ink: #303631; --muted: #79816f;
-  --line: #cbd0bc; --accent: #58855f; --haze: rgba(140, 170, 140, 0.22);
-}
-body[data-mood="chill"] {
-  --bg: #dfe6e9; --ink: #253039; --muted: #6f7f8a;
-  --line: #bfcad2; --accent: #3a6f8f; --haze: rgba(118, 148, 168, 0.28);
-}
-body[data-mood="cold"] {
-  --bg: #e4eaf1; --ink: #1d2937; --muted: #6b7b92;
-  --line: #c4cfde; --accent: #2f5e9e; --haze: rgba(138, 160, 200, 0.32);
-}
-
-/* ---------- mood palettes: night ---------- */
-
-body[data-night][data-mood="dry-heat"] {
-  --bg: #211809; --ink: #ead9b4; --muted: #97805a;
-  --line: #40331b; --accent: #e0762f; --haze: rgba(118, 68, 20, 0.45);
-}
-body[data-night][data-mood="humid-heat"] {
-  --bg: #171d12; --ink: #d9e0c4; --muted: #8a967a;
-  --line: #303a25; --accent: #8fb04c; --haze: rgba(62, 92, 40, 0.45);
-}
-body[data-night][data-mood="warm"] {
-  --bg: #1d1912 ; --ink: #eee4cd; --muted: #99906f;
-  --line: #383020; --accent: #d9a244; --haze: rgba(148, 108, 40, 0.32);
-}
-body[data-night][data-mood="mild"] {
-  --bg: #171a16; --ink: #dfe3d8; --muted: #8b937f;
-  --line: #2e332a; --accent: #7fae86; --haze: rgba(70, 110, 80, 0.32);
-}
-body[data-night][data-mood="chill"] {
-  --bg: #131a1f; --ink: #d8e2e8; --muted: #7c8d99;
-  --line: #28353e; --accent: #6fa7c7; --haze: rgba(48, 88, 118, 0.38);
-}
-body[data-night][data-mood="cold"] {
-  --bg: #0f151d; --ink: #dde6f2; --muted: #75859d;
-  --line: #243044; --accent: #6f9fdb; --haze: rgba(58, 88, 148, 0.38);
+  --line: #cbd0bc; --accent: #58855f; --haze: rgba(244, 240, 216, 0.55);
 }
 
 /* ---------- base ---------- */
@@ -126,9 +81,10 @@ button {
   border-radius: 2px;
 }
 
-.mono, .tagline, .block-title, .meta, .chip, .unit-toggle, .compare-btn,
+.mono, .tagline, .block-title, .meta, .chip, .unit-toggle, .text-btn,
 .ledger, .legend, .d-name, .d-lo, .d-air, .panel-note, .credit,
-.suggestions, .empty-hint, .ghost-btn, .cond span, .air-line, .hero-label {
+.suggestions, .empty-hint, .ghost-btn, .cond span, .air-line, .hero-label,
+.term, .log-date, .log-sha, .back-link {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -179,13 +135,20 @@ button {
   margin-bottom: 1.1rem;
 }
 
-.search { position: relative; flex: 1; max-width: 32rem; }
+.search {
+  position: relative;
+  flex: 1;
+  max-width: 32rem;
+  display: flex;
+  align-items: stretch;
+}
 
 #searchInput {
   font-family: "Fraunces", Georgia, serif;
   font-style: italic;
   font-size: clamp(1.1rem, 2.5vw, 1.35rem);
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: transparent;
   color: var(--ink);
   border: none;
@@ -195,6 +158,18 @@ button {
 }
 #searchInput::placeholder { color: var(--muted); opacity: 0.8; }
 #searchInput:focus { outline: none; border-bottom-color: var(--accent); }
+
+.search-btn {
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding: 0 0.45rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.search-btn svg { width: 19px; height: 19px; }
+.search-btn:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.search:focus-within .search-btn { border-bottom-color: var(--accent); }
 
 .suggestions {
   position: absolute;
@@ -219,7 +194,7 @@ button {
 }
 .sug-country { color: var(--muted); font-size: 0.68rem; }
 
-.compare-btn, .ghost-btn {
+.ghost-btn {
   font-size: 0.72rem;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -229,11 +204,21 @@ button {
   white-space: nowrap;
   transition: color 0.3s ease, border-color 0.3s ease;
 }
-.compare-btn:hover:not(:disabled), .ghost-btn:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+.ghost-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* small mono pill, e.g. "+ compare" in the panel header */
+.text-btn {
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.26rem 0.75rem;
+  white-space: nowrap;
+  align-self: center;
+  transition: color 0.3s ease, border-color 0.3s ease;
 }
-.compare-btn:disabled { opacity: 0.4; cursor: default; }
+.text-btn:hover { color: var(--accent); border-color: var(--accent); }
 
 /* ---------- favorites ---------- */
 
@@ -540,6 +525,130 @@ button {
 }
 
 .credit { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; margin-top: 1rem; }
+
+/* ---------- terms (clickable calculation names) ---------- */
+
+.term {
+  font-size: 0.68em;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px dashed var(--accent);
+  padding-bottom: 0.1em;
+  margin-right: 0.4em;
+  cursor: pointer;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.term:hover { border-bottom-style: solid; }
+
+/* ledger variant: quieter, sized like its row */
+.term-sm {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: inherit;
+  border-bottom: 1px dotted var(--muted);
+  margin-right: 0;
+}
+.term-sm:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ---------- calculation modal ---------- */
+
+#calcModal {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+  width: min(46rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 3rem);
+  padding: 0;
+  margin: auto;
+}
+#calcModal[open] { display: flex; flex-direction: column; }
+#calcModal::backdrop { background: rgba(8, 10, 16, 0.55); }
+
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.modal-head h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: -0.01em;
+}
+
+.modal-body {
+  padding: 1.1rem 1.25rem 1.5rem;
+  overflow-y: auto;
+  font-size: 0.92rem;
+  line-height: 1.65;
+}
+.modal-body h4 {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.35rem;
+  margin: 1.4rem 0 0.6rem;
+}
+.modal-what { margin: 0; }
+.modal-note {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  margin-bottom: 0.55rem;
+}
+.modal-code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  line-height: 1.55;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  padding: 0.8rem 0.9rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+.modal-cites { list-style: none; font-size: 0.8rem; }
+.modal-cites li { margin-bottom: 0.45em; }
+
+/* ---------- changelog page ---------- */
+
+.log { max-width: 46rem; }
+.log-intro { font-size: 0.92rem; line-height: 1.65; max-width: 38rem; margin-bottom: 1rem; }
+.log-version {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  border-top: 2px solid var(--ink);
+  padding-top: 0.7rem;
+  margin: 2.6rem 0 0.4rem;
+}
+.log-version h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; }
+.log-date { font-size: 0.66rem; letter-spacing: 0.06em; color: var(--muted); }
+.log-commit { border-top: 1px solid var(--line); padding: 1rem 0 1.1rem; }
+.log-commit h3 { font-size: 1.02rem; font-weight: 600; margin-bottom: 0.4rem; }
+.log-commit-body {
+  font-size: 0.88rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.log-sha { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.05em; }
+.back-link { font-size: 0.72rem; letter-spacing: 0.05em; }
 
 /* ---------- responsive ---------- */
 

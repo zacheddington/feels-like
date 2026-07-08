@@ -37,9 +37,11 @@ export const TUNING = {
   WIND_WARM_CAP: 6,
   WIND_DRYNESS_FLOOR: 0.15, // muggy air still cools a little
 
-  // Wind, cold side — NWS wind chill. Used below CHILL_TEMP, blended out
-  // by WARM_WIND_TEMP so there is no seam between the two regimes.
-  CHILL_TEMP: 60,
+  // Wind, cold side — the NWS wind chill formula, used strictly within its
+  // defined domain (air temp ≤ 50°F, wind ≥ 3 mph). Between CHILL_TEMP and
+  // WARM_WIND_TEMP the cold and warm models are blended linearly so there is
+  // no seam between the two regimes.
+  CHILL_TEMP: 50,
   WARM_WIND_TEMP: 65,
   CHILL_MIN_WIND: 3,
 
@@ -53,7 +55,7 @@ export const TUNING = {
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-function mugginess(temp, dewPoint) {
+export function mugginess(temp, dewPoint) {
   let base = 0;
   for (const tier of TUNING.MUGGY_TIERS) {
     base += Math.max(0, dewPoint - tier.above) * tier.rate;
@@ -65,26 +67,28 @@ function mugginess(temp, dewPoint) {
   return base * scale;
 }
 
-function dryRelief(temp, dewPoint) {
+export function dryRelief(temp, dewPoint) {
   if (dewPoint >= TUNING.DRY_DEW_POINT) return 0;
   const strength = clamp((temp - TUNING.DRY_TEMP_FLOOR) / TUNING.DRY_TEMP_SPAN, 0, 1);
   const relief = Math.min(TUNING.DRY_CAP, (TUNING.DRY_DEW_POINT - dewPoint) * TUNING.DRY_RATE);
   return -relief * strength;
 }
 
-function sunLoad(radiation) {
+export function sunLoad(radiation) {
   if (!radiation || radiation <= 0) return 0;
   return Math.min(TUNING.SUN_MAX, (radiation / TUNING.SUN_FULL_RADIATION) * TUNING.SUN_MAX);
 }
 
-// NWS wind chill, expressed as a delta from air temperature (always <= 0).
-function nwsChillDelta(temp, wind) {
+// The NWS wind chill formula (2001 NWS/JAG/TI):
+//   WC = 35.74 + 0.6215·T − 35.75·V^0.16 + 0.4275·T·V^0.16
+// expressed here as a delta from air temperature (always <= 0).
+export function nwsChillDelta(temp, wind) {
   const v = Math.pow(wind, 0.16);
   const chill = 35.74 + 0.6215 * temp - 35.75 * v + 0.4275 * temp * v;
   return Math.min(0, chill - temp);
 }
 
-function warmWindDelta(wind, dewPoint) {
+export function warmWindDelta(wind, dewPoint) {
   const dryness = clamp((65 - dewPoint) / 30, TUNING.WIND_DRYNESS_FLOOR, 1);
   const cooling = Math.min(
     TUNING.WIND_WARM_CAP,
@@ -93,7 +97,7 @@ function warmWindDelta(wind, dewPoint) {
   return -cooling;
 }
 
-function windEffect(temp, wind, dewPoint) {
+export function windEffect(temp, wind, dewPoint) {
   if (!wind || wind < TUNING.CHILL_MIN_WIND) return 0;
   if (temp <= TUNING.CHILL_TEMP) return nwsChillDelta(temp, wind);
   if (temp >= TUNING.WARM_WIND_TEMP) return warmWindDelta(wind, dewPoint);
@@ -101,7 +105,7 @@ function windEffect(temp, wind, dewPoint) {
   return nwsChillDelta(temp, wind) * (1 - t) + warmWindDelta(wind, dewPoint) * t;
 }
 
-function dampCold(temp, rh) {
+export function dampCold(temp, rh) {
   if (temp >= TUNING.DAMP_TEMP_CEIL || !rh || rh <= TUNING.DAMP_RH_FLOOR) return 0;
   const strength = clamp((TUNING.DAMP_TEMP_CEIL - temp) / TUNING.DAMP_TEMP_SPAN, 0, 1);
   const penalty = Math.min(TUNING.DAMP_CAP, (rh - TUNING.DAMP_RH_FLOOR) * TUNING.DAMP_RATE);

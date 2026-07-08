@@ -24,12 +24,18 @@
   </header>
 
   <div class="controls">
-    <div class="search" role="search">
+    <form class="search" id="searchForm" role="search">
       <input id="searchInput" type="text" placeholder="city or ZIP code"
-             autocomplete="off" spellcheck="false" aria-label="Search for a city or ZIP code">
+             autocomplete="off" spellcheck="false" enterkeyhint="search"
+             aria-label="Search for a city or ZIP code">
+      <button type="submit" class="search-btn" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.2"/><path d="M15.2 15.2L21 21"/>
+        </svg>
+      </button>
       <ul id="suggestions" class="suggestions" hidden></ul>
-    </div>
-    <button id="compareBtn" class="compare-btn" type="button">+ compare</button>
+    </form>
   </div>
 
   <nav id="favorites" class="favorites" aria-label="Favorite places"></nav>
@@ -42,27 +48,48 @@
       <div class="explainer-body">
         <p>Your skin doesn't feel air temperature — it feels how fast heat is leaving
         (or entering) your body. So the big number starts with air temperature and
-        adjusts it for the things that actually change that rate:</p>
-        <p><strong>mugginess.</strong> Built on <em>dew point</em>, not relative humidity.
-        Relative humidity lies — 100% humidity at 50° is pleasant. Dew point maps
-        directly to how sticky the air feels: above 65° is muggy anywhere on Earth,
-        above 72° is oppressive. The penalty grows steeply as dew point climbs, which is
-        why 91° in Mississippi and 91° in New Mexico get very different numbers here.</p>
-        <p><strong>dry air.</strong> When dew point is low, sweat evaporates instantly
-        and shade genuinely works. Dry heat gets a small credit.</p>
-        <p><strong>sun.</strong> Direct summer sun can add more than ten degrees of
-        perceived heat, and almost no app accounts for it. We scale this from measured
-        solar radiation, so clouds and low sun angles reduce it naturally.</p>
-        <p><strong>wind.</strong> Below 60° we use the NWS wind chill model. In warm
-        weather, moving air helps most when the air is dry enough for sweat to work.</p>
-        <p><strong>damp cold.</strong> Humid cold air pulls heat out of you faster than
-        dry cold. Raw, drizzly 40° gets marked down.</p>
+        adjusts it for the things that actually change that rate. Click any term below
+        to see the exact calculation running on this page, live, with sources.</p>
+        <p><button class="term" data-action="explain" data-modal="muggy">mugginess</button>
+        Built on <em>dew point</em>, not relative humidity. Relative humidity lies —
+        100% humidity at 50° is pleasant. Dew point maps directly to how sticky the
+        air feels: above 65° is muggy anywhere on Earth, above 72° is oppressive.
+        The penalty grows steeply as dew point climbs, which is why 91° in Mississippi
+        and 91° in New Mexico get very different numbers here.</p>
+        <p><button class="term" data-action="explain" data-modal="dry">dry air</button>
+        When dew point is low, sweat evaporates instantly and shade genuinely works.
+        Dry heat gets a small credit.</p>
+        <p><button class="term" data-action="explain" data-modal="sun">sun</button>
+        Direct summer sun can add more than ten degrees of perceived heat, and almost
+        no app accounts for it. We scale this from measured solar radiation, so clouds
+        and low sun angles reduce it naturally.</p>
+        <p><button class="term" data-action="explain" data-modal="wind">wind</button>
+        At or below 50° we use the NWS wind chill formula, exactly as published. In
+        warm air, moving air helps most when it's dry enough for sweat to work; in
+        between, the two models blend.</p>
+        <p><button class="term" data-action="explain" data-modal="damp">damp cold</button>
+        Humid cold air pulls heat out of you faster than dry cold. Raw, drizzly 40°
+        gets marked down.</p>
+        <p><button class="term" data-action="explain" data-modal="colors">the colors</button>
+        The background follows the sun at the place you searched — sunrise gold, pale
+        midday, dusk violet, deep night — with the weather tinting it and the accent
+        tracking the temperature.</p>
         <p>The ledger under the big number shows every adjustment, so you can argue
         with it. All the constants live in <code>js/feelslike.js</code>.</p>
       </div>
     </details>
-    <p class="credit">weather data by <a href="https://open-meteo.com/" rel="noopener">open-meteo</a> · built to disagree with your thermometer</p>
+    <p class="credit">weather data by <a href="https://open-meteo.com/" rel="noopener">open-meteo</a>
+      · <a href="./changelog.html">version history</a>
+      · built to disagree with your thermometer</p>
   </footer>
+
+  <dialog id="calcModal" aria-labelledby="calcModalTitle">
+    <div class="modal-head">
+      <h3 id="calcModalTitle"></h3>
+      <button class="icon-btn" data-close aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body" id="calcModalBody"></div>
+  </dialog>
 
   <script type="module" src="./js/app.js"></script>
 </body>

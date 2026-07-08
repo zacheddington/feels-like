@@ -1,7 +1,8 @@
 // ui.js — everything that turns state into DOM. No fetching, no storage here.
 // app.js owns state and events; this file only renders.
 
-import { computeFeelsLike, classifyMood } from './feelslike.js';
+import { computeFeelsLike } from './feelslike.js';
+import { applyTheme } from './theme.js';
 import { locKey } from './storage.js';
 
 /* ---------- formatting ---------- */
@@ -149,7 +150,8 @@ function ledgerHTML(data, unit) {
   };
   const rows = feel.components.map((comp) => `
     <div class="row">
-      <dt>${comp.label}${details[comp.key] ? `<span class="det">${details[comp.key]}</span>` : ''}</dt>
+      <dt><button class="term term-sm" data-action="explain" data-modal="${comp.key}"
+        title="see this calculation">${comp.label}</button>${details[comp.key] ? `<span class="det">${details[comp.key]}</span>` : ''}</dt>
       <dd class="${comp.delta >= 0 ? 'up' : 'down'}">${delta(comp.delta, unit)}</dd>
     </div>`).join('');
   return `
@@ -257,8 +259,12 @@ const STAR = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"
 function panelHTML(entry, state, slot) {
   const { loc, data, status, message } = entry;
   const isFav = state.favorites.some((f) => locKey(f) === locKey(loc));
-  const removeBtn = state.panels.filter(Boolean).length === 2
+  const panelCount = state.panels.filter(Boolean).length;
+  const removeBtn = panelCount === 2
     ? `<button class="icon-btn" data-action="remove" data-slot="${slot}" aria-label="Remove ${esc(loc.name)}" title="remove">✕</button>`
+    : '';
+  const compareBtn = slot === 0 && panelCount === 1 && status === 'ready'
+    ? `<button class="text-btn" data-action="compare">${state.searchTarget === 1 ? 'cancel' : '+ compare'}</button>`
     : '';
   let body = '';
   if (status === 'loading') {
@@ -283,6 +289,7 @@ function panelHTML(entry, state, slot) {
     <header class="panel-head">
       <h2 class="place">${esc(loc.name)}${loc.region ? `<span class="region">, ${esc(loc.region)}</span>` : ''}</h2>
       <div class="panel-actions">
+        ${compareBtn}
         <button class="icon-btn fav${isFav ? ' active' : ''}" data-action="fav" data-slot="${slot}"
           aria-label="${isFav ? 'Remove from' : 'Add to'} favorites" aria-pressed="${isFav}"
           title="favorite">${STAR}</button>
@@ -311,18 +318,24 @@ export function renderSuggestions(state) {
 }
 
 function applyMood(state) {
-  const body = document.body;
   const primary = state.panels[0];
   if (!primary || !primary.data) {
-    body.dataset.mood = 'mild';
-    delete body.dataset.night;
+    applyTheme(); // sky clock at the browser's local time, clear weather
     return;
   }
-  const c = primary.data.current;
-  const feel = currentFeel(primary.data);
-  body.dataset.mood = classifyMood(feel.value, c.dew_point_2m);
-  if (c.is_day) delete body.dataset.night;
-  else body.dataset.night = 'true';
+  const d = primary.data;
+  const c = d.current;
+  const feel = currentFeel(d);
+  applyTheme({
+    timeISO: c.time,
+    sunriseISO: d.daily.sunrise ? d.daily.sunrise[0] : null,
+    sunsetISO: d.daily.sunset ? d.daily.sunset[0] : null,
+    weatherCode: c.weather_code,
+    cloudCover: c.cloud_cover,
+    isDay: c.is_day,
+    feelsLike: feel.value,
+    dewPoint: c.dew_point_2m,
+  });
 }
 
 export function renderAll(state) {
@@ -355,12 +368,6 @@ export function renderAll(state) {
   document.querySelectorAll('#unitToggle [data-unit]').forEach((el) => {
     el.classList.toggle('active', el.dataset.unit === state.unit);
   });
-
-  // Compare button
-  const cmp = document.getElementById('compareBtn');
-  cmp.textContent = panels.length === 2 ? '− remove compare'
-    : state.searchTarget === 1 ? 'pick a second city…' : '+ compare';
-  cmp.disabled = !panels.length && state.searchTarget !== 1;
 
   document.title = panels[0]
     ? `Feels Like — ${panels[0].loc.name}`

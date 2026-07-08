@@ -24,14 +24,14 @@ function rhFrom(tempF, dpF) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
-export function mockWeather(name, forceNight) {
+export function mockWeather(name, opts = {}) {
   const s = SCENARIOS[name] || SCENARIOS.mild;
   const hourly = {
     time: [], temperature_2m: [], relative_humidity_2m: [], dew_point_2m: [],
     wind_speed_10m: [], cloud_cover: [], shortwave_radiation: [],
     precipitation_probability: [], weather_code: [], is_day: [],
   };
-  const daily = { time: [], weather_code: [] };
+  const daily = { time: [], weather_code: [], sunrise: [], sunset: [] };
   const codeCycle = [s.code, s.code, 3, s.code, 2, s.code, 1];
 
   const start = new Date();
@@ -41,6 +41,8 @@ export function mockWeather(name, forceNight) {
     const dateStr = `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
     daily.time.push(dateStr);
     daily.weather_code.push(codeCycle[d]);
+    daily.sunrise.push(`${dateStr}T06:12`);
+    daily.sunset.push(`${dateStr}T20:24`);
     for (let h = 0; h < 24; h++) {
       // Diurnal curve: coldest ~4am, hottest ~4pm
       const frac = 0.5 * (1 - Math.cos((2 * Math.PI * (h - 4)) / 24));
@@ -60,9 +62,12 @@ export function mockWeather(name, forceNight) {
     }
   }
 
-  // Mock "now" is pinned to 3pm (or 10pm with ?night) so every scenario looks
-  // the same no matter when you test it — the scenario name matches the mood.
-  const nowHour = forceNight ? 22 : 15;
+  // Mock "now" is pinned to 3pm (or 10pm with ?night, or any 0–23 value via
+  // ?hour=N) so scenarios are deterministic no matter when you test them.
+  // ?hour is also how you preview the sky clock at any time of day.
+  const nowHour = opts.hour != null && !Number.isNaN(+opts.hour)
+    ? Math.max(0, Math.min(23, Math.round(+opts.hour)))
+    : (opts.night ? 22 : 15);
   const nowIndex = nowHour; // first mock day starts at midnight today
   const current = {
     time: hourly.time[nowIndex],
@@ -73,7 +78,7 @@ export function mockWeather(name, forceNight) {
     cloud_cover: hourly.cloud_cover[nowIndex],
     shortwave_radiation: hourly.shortwave_radiation[nowIndex],
     weather_code: hourly.weather_code[nowIndex],
-    is_day: forceNight ? 0 : hourly.is_day[nowIndex],
+    is_day: hourly.is_day[nowIndex],
     precipitation: 0,
   };
 
