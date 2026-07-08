@@ -26,7 +26,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* Painting html (not just body) keeps iOS overscroll, the status-bar
+     region, and rubber-banding the same color as the page. */
+  background-color: var(--bg);
+  transition: background-color 1.2s ease;
+}
 
 body {
   font-family: "Fraunces", Georgia, serif;
@@ -36,16 +42,23 @@ body {
   min-height: 100dvh;
   max-width: 1150px;
   margin: 0 auto;
-  padding: clamp(1.2rem, 4vw, 3rem);
+  /* env() insets keep content clear of the notch / Dynamic Island / home
+     indicator when launched from the home screen (viewport-fit=cover). */
+  padding:
+    calc(clamp(1.2rem, 4vw, 3rem) + env(safe-area-inset-top, 0px))
+    calc(clamp(1.2rem, 4vw, 3rem) + env(safe-area-inset-right, 0px))
+    calc(clamp(1.2rem, 4vw, 3rem) + env(safe-area-inset-bottom, 0px))
+    calc(clamp(1.2rem, 4vw, 3rem) + env(safe-area-inset-left, 0px));
   transition: background-color 1.2s ease, color 0.8s ease;
   position: relative;
 }
 
-/* atmospheric wash, top-left — each mood tints it differently */
+/* atmospheric wash, top-left — overdrawn past the viewport so iOS toolbar
+   collapse and overscroll never expose an unpainted band */
 body::before {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -12% -6%;
   background: radial-gradient(ellipse 90% 60% at 18% -12%, var(--haze), transparent 65%);
   pointer-events: none;
   z-index: -1;
@@ -55,7 +68,7 @@ body::before {
 body::after {
   content: "";
   position: fixed;
-  inset: 0;
+  inset: -12% -6%;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
   opacity: 0.24;
   mix-blend-mode: soft-light;

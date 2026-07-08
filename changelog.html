@@ -2,9 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Feels Like — version history</title>
   <meta name="description" content="Every change to the Feels Like weather app, straight from its commit history.">
+  <meta name="theme-color" content="#e9ebe2">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Feels Like">
+  <script>
+    (function () {
+      try {
+        var p = JSON.parse(localStorage.getItem('feelslike:palette'));
+        if (!p || !p.vars) return;
+        for (var k in p.vars) document.documentElement.style.setProperty(k, p.vars[k]);
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.content = p.vars['--bg'];
+      } catch (e) {}
+    })();
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%23b5490f' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23b5490f'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

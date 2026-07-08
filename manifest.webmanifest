@@ -1,0 +1,17 @@
+{
+  "name": "Feels Like",
+  "short_name": "Feels Like",
+  "description": "The only number that matters is the one your skin reports.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0cf96",
+  "theme_color": "#f0cf96",
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

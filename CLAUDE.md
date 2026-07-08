@@ -37,6 +37,9 @@ wind, and damp cold, with a visible breakdown ledger. Hosted on GitHub Pages.
 | `js/mock.js` | Synthetic weather scenarios for offline testing / theme previews |
 | `js/storage.js` | localStorage wrapper (`feelslike:unit`, `feelslike:favorites`, `feelslike:active`) |
 | `changelog.html` + `js/changelog.js` | Version history page: GitHub tags become headings, commit messages become entries |
+| `manifest.webmanifest` + `sw.js` + `icons/` | PWA layer: installable, offline-capable (network-first shell, cached last weather) |
+| `tools/audit-contrast.mjs` | Accessibility gate: sweeps every sky × weather × mood palette against the contrast floors |
+| `tools/make-icons.mjs` | Regenerates the PNG icons from code (`node tools/make-icons.mjs`) |
 
 Data flow: search → `api.searchPlaces` → user picks → `api.fetchWeather` →
 `app.loadPanel` stores `{loc, data, status}` in `state.panels[slot]` →
@@ -110,15 +113,25 @@ static `:root` fallback in style.css). Three layers:
 2. **Weather tint**: `weatherTint()` mixes a tint into the sky by WMO code
    family (thunder, snow, rain, drizzle, fog, overcast, partly). Strengths are
    capped ≲ 0.42 so time of day always shows through; night halves them.
-3. **Derived text + accent**: `--ink/--muted/--line` are mixed from the final
-   background by luminance (threshold 0.32 flips dark/light ink), so contrast
-   is guaranteed — never hand-set text colors. `--accent` comes from
-   `classifyMood(feelsLike, dewPoint)` (same table as before: ≥85 humid/dry
-   heat split at dew point 62, then warm/mild/chill/cold at 70/55/38) with an
-   on-light and on-dark variant per mood in `ACCENTS`.
+3. **Contrast enforcement (do not weaken)**: backgrounds are pushed out of
+   the luminance "dead zone" (`escapeDeadZone`, L 0.095–0.315) where no text
+   color can reach 7:1 — twilight and fog land there constantly. Then
+   `ensureContrast()` guarantees the floors in `CONTRAST_FLOORS`: ink ≥ 7:1,
+   muted ≥ 4.5:1, accent ≥ 4.5:1 against the final background. Never hand-set
+   text colors; never bypass these floors. `--accent` starts from
+   `classifyMood(feelsLike, dewPoint)` (≥85 humid/dry heat split at dew point
+   62, then warm/mild/chill/cold at 70/55/38) with on-light/on-dark variants
+   in `ACCENTS`, then gets contrast-corrected.
+
+**After ANY change to theme.js, run `node tools/audit-contrast.mjs`** — it
+sweeps ~28k palette combinations and exits non-zero on any floor violation.
 
 To preview: `?mock=<scenario>&hour=<0–23>` steps the sky clock;
 scenarios carry the weather (e.g. `chill` is rain, `cold` is snow).
+`computePalette()` is pure (no DOM); `applyTheme()` applies it to CSS
+variables, `body[data-mood]/[data-night]`, the `theme-color` meta, and a
+localStorage copy (`feelslike:palette`) that an inline script in each page's
+`<head>` restores before first paint to prevent a daylight flash at night.
 
 ## Mock mode — test without the network
 
@@ -181,12 +194,29 @@ Releasing is therefore just git hygiene:
 
 1. Write the commit message **for end users** — plain-English title, body
    listing what they'll notice. It will be displayed verbatim.
-2. Tag the release commit and push both:
+2. **Bump `VERSION` in `sw.js`** to match the release tag — this is what
+   retires the old offline cache on users' devices. Skipping it means users
+   may run a stale shell offline.
+3. If theme.js changed, `node tools/audit-contrast.mjs` must pass.
+4. Tag the release commit and push both:
    `git tag vX.Y && git push && git push --tags`
-3. Versions are `v1.0`, `v1.1`, … — bump the minor for feature releases,
+5. Versions are `v1.0`, `v1.1`, … — bump the minor for feature releases,
    patch (`v1.1.1`) for small fixes. Untagged commits newer than the latest
    tag appear on the page under "next / not yet released", so don't leave
    `main` untagged for long.
+
+## PWA notes
+
+- The app is installable (Add to Home Screen) and works offline: `sw.js`
+  serves the shell network-first (fresh when online, cached when not) and
+  falls back to the last cached weather-API responses offline.
+- iOS specifics already handled — don't regress them: `viewport-fit=cover` +
+  `env(safe-area-inset-*)` body padding, `html` background painted (prevents
+  unpainted status-bar/overscroll bands), fixed overlays overdrawn past the
+  viewport, `theme-color` synced to `--bg` on every theme apply.
+- Icon changes: edit `tools/make-icons.mjs` and re-run it; never hand-edit
+  the PNGs. After changing icons or manifest, users must remove and re-add
+  the home-screen icon to see the change.
 
 ## Common tasks
 

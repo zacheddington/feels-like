@@ -179,6 +179,12 @@ document.getElementById('unitToggle').addEventListener('click', () => {
 
 /* ---------- boot ---------- */
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {
+    /* http (non-localhost) or unsupported — the app works fine without it */
+  });
+}
+
 function init() {
   initExplainer();
   const params = new URLSearchParams(location.search);

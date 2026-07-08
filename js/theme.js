@@ -38,6 +38,51 @@ const rgba = (hex, a) => {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 };
 
+// WCAG contrast ratio, 1–21
+export function contrast(a, b) {
+  const la = luminance(a), lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// Push fg toward black or white — whichever can reach further against this
+// background — until it clears `target` contrast. Keeps the hue as long as
+// possible; worst case returns pure black/white. This is what guarantees
+// readability at every minute of the sky clock, including twilight, where
+// hand-picked colors reliably fail (see tools/audit-contrast.mjs).
+export function ensureContrast(fg, bg, target) {
+  if (contrast(fg, bg) >= target) return fg;
+  const lb = luminance(bg);
+  const toward = (1.05 / (lb + 0.05)) >= ((lb + 0.05) / 0.05) ? '#ffffff' : '#000000';
+  for (let t = 0.05; t < 1; t += 0.05) {
+    const out = mix(fg, toward, t);
+    if (contrast(out, bg) >= target) return out;
+  }
+  return toward;
+}
+
+// Contrast floors for every color the theme derives. The audit script
+// enforces these; don't lower them.
+export const CONTRAST_FLOORS = { ink: 7, muted: 4.5, accent: 4.5 };
+
+// The dead zone: background luminances where NO text color can reach the ink
+// floor — 7:1 needs bg L ≤ ~0.095 (light text) or ≥ ~0.315 (dark text).
+// Twilight and fog/snow tints land here constantly (this is exactly the
+// hard-to-read dusk bug). Backgrounds get nudged to the nearest edge instead
+// of compromising on readability.
+const DEAD_LO = 0.095, DEAD_HI = 0.315, DEAD_MID = 0.18;
+
+function escapeDeadZone(hex) {
+  const L = luminance(hex);
+  if (L <= DEAD_LO || L >= DEAD_HI) return hex;
+  const toward = L > DEAD_MID ? '#ffffff' : '#05070f';
+  for (let t = 0.03; t < 1; t += 0.03) {
+    const out = mix(hex, toward, t);
+    const l2 = luminance(out);
+    if (l2 <= DEAD_LO || l2 >= DEAD_HI) return out;
+  }
+  return toward;
+}
+
 /* ---------- the sky ---------- */
 
 const NIGHT_BG = '#0d1426';
@@ -106,7 +151,7 @@ export function weatherTint(code, cloudCover, isDay) {
 /* ---------- temperature accent ---------- */
 
 // [on light background, on dark background] per mood.
-const ACCENTS = {
+export const ACCENTS = {
   'dry-heat': ['#b5490f', '#e0762f'],
   'humid-heat': ['#55742e', '#8fb04c'],
   warm: ['#c07f1f', '#d9a244'],
@@ -121,19 +166,19 @@ const isoMinutes = (iso) =>
   iso ? parseInt(iso.slice(11, 13), 10) * 60 + parseInt(iso.slice(14, 16), 10) : null;
 
 /**
- * Compute the palette and set it as CSS variables on <html>, overriding the
- * static :root fallback in style.css. All inputs optional — the defaults give
- * a clear day at the browser's local time (used by the empty state and the
- * changelog page). ISO times are the location's local wall clock, exactly as
- * Open-Meteo returns them with timezone=auto.
+ * Pure palette computation — no DOM access, so tools/audit-contrast.mjs can
+ * sweep it under Node. All inputs optional; the defaults give a clear day at
+ * the given (or browser-local) time. ISO times are the location's local wall
+ * clock, exactly as Open-Meteo returns them with timezone=auto.
  */
-export function applyTheme({
+export function computePalette({
   timeISO, sunriseISO, sunsetISO,
   weatherCode = 0, cloudCover = 0, isDay,
   feelsLike = 65, dewPoint = 45,
+  nowMinute,
 } = {}) {
-  const now = new Date();
-  const minute = isoMinutes(timeISO) ?? now.getHours() * 60 + now.getMinutes();
+  const minute = isoMinutes(timeISO) ?? nowMinute
+    ?? new Date().getHours() * 60 + new Date().getMinutes();
   const sunrise = isoMinutes(sunriseISO) ?? 390;  // 6:30am fallback
   const sunset = isoMinutes(sunsetISO) ?? 1185;   // 7:45pm fallback
 
@@ -144,24 +189,48 @@ export function applyTheme({
     bg = mix(bg, w.tint, w.amt);
     glow = mix(glow, w.tint, w.amt * 0.6);
   }
+  bg = escapeDeadZone(bg);
 
-  const lightBg = luminance(bg) > 0.32;
-  const ink = lightBg ? mix('#241f18', bg, 0.10) : mix('#f5f1e6', bg, 0.12);
+  const lightBg = luminance(bg) > DEAD_MID;
+  const inkBase = lightBg ? mix('#241f18', bg, 0.10) : mix('#f5f1e6', bg, 0.12);
+  const ink = ensureContrast(inkBase, bg, CONTRAST_FLOORS.ink);
+  const muted = ensureContrast(mix(ink, bg, 0.42), bg, CONTRAST_FLOORS.muted);
   const mood = classifyMood(feelsLike, dewPoint);
+  const accent = ensureContrast(ACCENTS[mood][lightBg ? 0 : 1], bg, CONTRAST_FLOORS.accent);
 
-  const vars = {
-    '--bg': bg,
-    '--ink': ink,
-    '--muted': mix(ink, bg, 0.42),
-    '--line': mix(ink, bg, 0.70),
-    '--accent': ACCENTS[mood][lightBg ? 0 : 1],
-    '--haze': rgba(glow, 0.55),
+  return {
+    mood,
+    night: !lightBg,
+    vars: {
+      '--bg': bg,
+      '--ink': ink,
+      '--muted': muted,
+      '--line': mix(ink, bg, 0.70),
+      '--accent': accent,
+      '--haze': rgba(glow, 0.55),
+    },
   };
-  for (const [k, v] of Object.entries(vars)) {
+}
+
+/**
+ * Compute the palette and apply it: CSS variables on <html> (overriding the
+ * static :root fallback), body dataset hooks, the browser-chrome theme-color,
+ * and a localStorage copy that index.html restores before first paint so a
+ * night-time load never flashes daylight colors.
+ */
+export function applyTheme(input = {}) {
+  const p = computePalette(input);
+  for (const [k, v] of Object.entries(p.vars)) {
     document.documentElement.style.setProperty(k, v);
   }
-  document.body.dataset.mood = mood;
-  if (lightBg) delete document.body.dataset.night;
-  else document.body.dataset.night = 'true';
-  return vars;
+  document.body.dataset.mood = p.mood;
+  if (p.night) document.body.dataset.night = 'true';
+  else delete document.body.dataset.night;
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = p.vars['--bg'];
+  try {
+    localStorage.setItem('feelslike:palette', JSON.stringify(p));
+  } catch { /* private mode — the flash guard just won't help */ }
+  return p.vars;
 }
