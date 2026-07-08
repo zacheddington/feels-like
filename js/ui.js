@@ -135,6 +135,12 @@ function heroHTML(entry, unit) {
   const data = entry.data;
   const c = data.current;
   const feel = currentFeel(data);
+  // The shade counterfactual: the same number minus the sun's contribution.
+  // Only shown when the sun is actually part of the story (≥ 2°F).
+  const sun = feel.components.find((comp) => comp.key === 'sun');
+  const shadeLine = sun && sun.delta >= 2
+    ? `<span class="shade-line">in the shade, more like <strong>${t(feel.value - sun.delta, unit)}°</strong></span>`
+    : '';
   return `
   <div class="hero">
     <div class="hero-num-wrap">
@@ -144,6 +150,7 @@ function heroHTML(entry, unit) {
     <div class="hero-side">
       <span class="cond">${glyph(c.weather_code, c.is_day)}<span>${condLabel(c.weather_code)}</span></span>
       <span class="air-line">thermometer says <strong>${t(c.temperature_2m, unit)}°</strong></span>
+      ${shadeLine}
       <span class="meta">dew point ${t(c.dew_point_2m, unit)}° · humidity ${Math.round(c.relative_humidity_2m)}% · wind ${windFmt(c.wind_speed_10m, unit)}</span>
       ${ageLine(entry)}
     </div>

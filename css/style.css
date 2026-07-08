@@ -97,7 +97,7 @@ button {
 .mono, .tagline, .block-title, .meta, .chip, .unit-toggle, .text-btn,
 .ledger, .legend, .d-name, .d-lo, .d-air, .panel-note, .credit,
 .suggestions, .empty-hint, .ghost-btn, .cond span, .air-line, .hero-label,
-.term, .log-date, .log-sha, .back-link, .age, .fb-trigger, .fb-row {
+.term, .log-date, .log-sha, .back-link, .age, .fb-trigger, .fb-row, .shade-line {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -375,6 +375,9 @@ button {
 
 .air-line { color: var(--muted); }
 .air-line strong { color: var(--ink); font-weight: 500; }
+
+.shade-line { color: var(--muted); }
+.shade-line strong { color: var(--accent); font-weight: 500; }
 
 .meta { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.02em; }
 

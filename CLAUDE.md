@@ -92,6 +92,15 @@ Every constant is in the exported `TUNING` object — tune there, nowhere else.
 `computeFeelsLike(obs)` returns `{ value, air, components }`; components with
 |delta| < 0.5°F are dropped from the ledger.
 
+The hero also shows a **shade counterfactual** ("in the shade, more like N°")
+whenever the sun component is ≥ 2°F — it's simply `value − sun delta`,
+computed in `heroHTML()` (ui.js), not a separate formula.
+
+**Queued formula idea (do NOT implement without feedback data):** scale
+mugginess by total heat load (air temp + sun) instead of air temp alone —
+matches both "humid shade brings little relief" and "dry sun runs hot"
+reports. Validate against feedback rows first (see The feedback loop).
+
 ### Regression checks (run in the browser console at the site root)
 
 ```js
@@ -228,8 +237,11 @@ feels like to them. The submission carries a full conditions snapshot (air,
 dew point, humidity, wind, radiation, weather code, our value, theirs, place,
 local time) — labeled data for tuning TUNING.
 
-**Wiring the Google Form** (currently NOT configured; submissions fall back
-to a pre-filled email draft to FALLBACK_EMAIL):
+**The Google Form IS configured** (since v1.5, 2026-07-08) — submissions post
+silently to Zach's form; responses live in the form's Responses tab (a Sheet
+can be linked later without breaking anything). Two wiring-test rows exist
+from setup (snapshot says "wiring test" / `mock: true`) — exclude them from
+analysis. If the form ever changes, re-derive the wiring like this:
 1. Create a Google Form with three "short answer" questions: felt, ours,
    snapshot.
 2. Get a pre-filled link (⋮ → Get pre-filled link), fill dummy values, copy

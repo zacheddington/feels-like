@@ -15,12 +15,11 @@
 import { computeFeelsLike } from './feelslike.js';
 
 export const FEEDBACK_FORM = {
-  // e.g. 'https://docs.google.com/forms/d/e/<form-id>/formResponse'
-  action: '',
+  action: 'https://docs.google.com/forms/d/e/1FAIpQLSfFoG5QjWjw8BrQGDn9dX35_NNHZlDR4zNAvPTO59Ih4DMLcA/formResponse',
   fields: {
-    felt: 'entry.0000001',      // their number, °F
-    ours: 'entry.0000002',      // our number, °F
-    snapshot: 'entry.0000003',  // full conditions JSON
+    felt: 'entry.1314273606',     // their number, °F
+    ours: 'entry.352102540',      // our number, °F
+    snapshot: 'entry.1565558106', // full conditions JSON
   },
 };
 
