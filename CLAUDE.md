@@ -206,7 +206,10 @@ tags become version headings, commit messages become the entries under them.
 Releasing is therefore just git hygiene:
 
 1. Write the commit message **for end users** — plain-English title, body
-   listing what they'll notice. It will be displayed verbatim.
+   listing what they'll notice. It will be displayed verbatim. Hard-wrapping
+   the body is fine: the changelog page unwraps single newlines into spaces
+   (blank lines = paragraph breaks; lines starting with `-`/`*`/digits keep
+   their breaks, so lists survive).
 2. **Bump `VERSION` in `sw.js`** to match the release tag — this is what
    retires the old offline cache on users' devices. Skipping it means users
    may run a stale shell offline.

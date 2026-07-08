@@ -528,6 +528,10 @@ button {
   padding-top: 1.1rem;
 }
 
+/* Constant gap below, open or closed — the body's padding used to be the
+   only spacing, so the collapsed state sat flush against the backup row. */
+.explainer { margin-bottom: 1rem; }
+
 .explainer summary {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.7rem;
@@ -540,7 +544,7 @@ button {
 
 .explainer-body {
   max-width: 42rem;
-  padding: 1.2rem 0 0.6rem;
+  padding: 1.2rem 0 0;
   font-size: 0.92rem;
   line-height: 1.65;
 }
@@ -647,7 +651,11 @@ button {
   border: 1px solid var(--line);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
   width: min(46rem, calc(100vw - 2rem));
-  max-height: calc(100dvh - 3rem);
+  /* Subtract safe-area insets so a centered tall modal can never push its
+     header (and the ✕) under the notch/status bar in the installed app —
+     only .modal-body scrolls, so the header must always be on-screen. */
+  max-height: calc(100dvh - 3rem
+    - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   padding: 0;
   margin: auto;
 }
@@ -731,9 +739,11 @@ button {
 .log-commit-body {
   font-size: 0.88rem;
   line-height: 1.65;
-  white-space: pre-wrap;
   color: var(--ink);
+  margin-bottom: 0.6em;
 }
+
+.wordmark-link { color: inherit; text-decoration: none; }
 .log-sha { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.05em; }
 .back-link { font-size: 0.72rem; letter-spacing: 0.05em; }
 

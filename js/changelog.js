@@ -37,11 +37,18 @@ async function getJSON(url) {
 function commitHTML(c) {
   const msg = cleanMessage(c.commit.message);
   const [title, ...rest] = msg.split('\n\n');
+  // Commit bodies are hard-wrapped at ~72 chars by convention. Unwrap those
+  // single newlines into spaces (blank lines stay paragraph breaks, and lines
+  // starting like list items keep their breaks) so sentences flow naturally.
   const body = rest.join('\n\n').trim();
+  const paragraphs = body
+    ? body.split(/\n{2,}/).map((p) =>
+        `<p class="log-commit-body">${esc(p.replace(/\n(?![-*•\d])/g, ' '))}</p>`).join('')
+    : '';
   return `
   <article class="log-commit">
     <h3>${esc(title)}</h3>
-    ${body ? `<p class="log-commit-body">${esc(body)}</p>` : ''}
+    ${paragraphs}
     <span class="log-sha">${esc(c.sha.slice(0, 7))} · ${esc(fmtDate(c.commit.author.date))}</span>
   </article>`;
 }
