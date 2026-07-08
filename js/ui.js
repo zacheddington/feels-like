@@ -4,6 +4,7 @@
 import { computeFeelsLike } from './feelslike.js';
 import { applyTheme } from './theme.js';
 import { locKey } from './storage.js';
+import { getUsage } from './api.js';
 
 /* ---------- formatting ---------- */
 
@@ -324,9 +325,11 @@ export function renderSuggestions(state) {
   ul.hidden = false;
   ul.innerHTML = state.suggestions.map((p, i) => `
     <li class="${i === state.selIdx ? 'sel' : ''}" data-action="pick" data-idx="${i}" role="option">
-      ${esc(p.name)}${p.region ? `, ${esc(p.region)}` : ''}
+      <span>${esc(p.name)}${p.region ? `, ${esc(p.region)}` : ''}${p.near ? '<span class="sug-near">nearby</span>' : ''}</span>
       <span class="sug-country">${esc(p.country)}</span>
     </li>`).join('');
+  const sel = ul.querySelector('.sel');
+  if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
 
 function applyMood(state) {
@@ -368,16 +371,33 @@ export function renderAll(state) {
   }
   panelsEl.classList.toggle('compare', panels.length === 2);
 
-  // Favorites bar (+ backup link — localStorage is evictable, esp. iOS PWAs)
+  // Favorites bar
   const favEl = document.getElementById('favorites');
   favEl.innerHTML = state.favorites.map((f, i) => `
     <button class="chip" data-action="chip" data-idx="${i}">
       ${esc(f.name)}${f.region ? `<span class="chip-region"> ${esc(f.region)}</span>` : ''}
-    </button>`).join('')
-    + (state.favorites.length ? `
-    <button class="chip chip-backup" data-action="backup"
-      title="copies a link that restores these favorites on any device">backup</button>` : '');
+    </button>`).join('');
   favEl.hidden = !state.favorites.length;
+
+  // Footer: backup link (localStorage is evictable — see CLAUDE.md) and the
+  // per-device API meter, which only appears with ?debug in the URL.
+  const backupRow = document.getElementById('backupRow');
+  if (backupRow) {
+    backupRow.hidden = !state.favorites.length;
+    backupRow.innerHTML = state.favorites.length ? `
+      <button class="footer-link" data-action="backup">backup my favorites</button>
+      <span class="backup-hint">— copies a link that restores your saved places on any
+      device or browser. Keep it somewhere safe; it's your insurance against cleared
+      site data.</span>` : '';
+  }
+  const dbg = document.getElementById('debugUsage');
+  if (dbg) {
+    dbg.hidden = !state.debug;
+    if (state.debug) {
+      const u = getUsage();
+      dbg.textContent = `open-meteo calls from this device: ${u.today} today · ${u.week} in the last 7 days (each visitor draws on their own allowance, not yours)`;
+    }
+  }
 
   // Unit toggle
   document.querySelectorAll('#unitToggle [data-unit]').forEach((el) => {

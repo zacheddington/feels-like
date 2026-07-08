@@ -93,6 +93,26 @@ function pick(place) {
   loadPanel(slot, place);
 }
 
+// People usually search for places near the one they're already looking at:
+// float the closest few results to the top, tagged "nearby" in the dropdown.
+// The rest keep the geocoder's relevance/population order.
+function promoteNearby(results) {
+  const ref = state.panels[0]?.loc;
+  if (!ref || ref.lat == null || ref.mock || results.length <= 3) return;
+  const distSq = (p) => {
+    const dx = (p.lon - ref.lon) * Math.cos((((+p.lat) + (+ref.lat)) / 2) * Math.PI / 180);
+    const dy = p.lat - ref.lat;
+    return dx * dx + dy * dy;
+  };
+  const near = [...results].sort((a, b) => distSq(a) - distSq(b)).slice(0, 3)
+    .filter((p) => distSq(p) < 25); // ~within 350 miles
+  if (!near.length) return;
+  near.forEach((p) => { p.near = true; });
+  const rest = results.filter((p) => !near.includes(p));
+  results.length = 0;
+  results.push(...near, ...rest);
+}
+
 async function runSearch() {
   const q = input.value.trim();
   if (q.length < 2) {
@@ -105,6 +125,8 @@ async function runSearch() {
   } catch {
     state.suggestions = [];
   }
+  promoteNearby(state.suggestions);
+  state.suggestions = state.suggestions.slice(0, 14);
   state.selIdx = state.suggestions.length ? 0 : -1;
   renderSuggestions(state);
 }
@@ -183,7 +205,14 @@ document.addEventListener('click', (e) => {
   const slot = +el.dataset.slot;
   switch (el.dataset.action) {
     case 'pick': pick(state.suggestions[+el.dataset.idx]); break;
-    case 'chip': state.searchTarget = 0; loadPanel(0, state.favorites[+el.dataset.idx]); break;
+    case 'chip': {
+      // While a compare is pending, a favorite chip fills the second slot
+      const target = state.searchTarget === 1 ? 1 : 0;
+      state.searchTarget = 0;
+      resetSearch();
+      loadPanel(target, state.favorites[+el.dataset.idx]);
+      break;
+    }
     case 'fav': toggleFavorite(state.panels[slot].loc); break;
     case 'remove': removePanel(slot); break;
     case 'compare': toggleCompareSearch(); break;
@@ -211,7 +240,9 @@ function toggleCompareSearch() {
     resetSearch();
   } else {
     state.searchTarget = 1;
-    input.placeholder = 'compare with…';
+    input.placeholder = state.favorites.length
+      ? 'compare with… (or tap a favorite)'
+      : 'compare with…';
     input.focus();
   }
   render();
@@ -235,6 +266,7 @@ function init() {
   initExplainer();
   initFeedback();
   const params = new URLSearchParams(location.search);
+  state.debug = params.has('debug');
 
   // ?restore=<payload> — favorites backup link (see copyBackupLink)
   const restore = params.get('restore');

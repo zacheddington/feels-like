@@ -45,6 +45,7 @@ const STATE_NAMES = Object.fromEntries(Object.entries(US_STATES).map(([abbr, nam
   [abbr.toUpperCase(), name.replace(/\b\w/g, (c) => c.toUpperCase())]));
 
 async function geocode(name, count = 6) {
+  bumpUsage();
   const j = await getJSON(`${GEOCODE}?name=${encodeURIComponent(name)}&count=${count}&language=en&format=json`);
   return (j.results || []).map(r => ({
     name: r.name,
@@ -86,7 +87,10 @@ export async function searchPlaces(query) {
     }
   }
 
-  let results = await geocode(q);
+  // Fetch deep: the geocoder ranks by population, so small towns sit well
+  // past the first page (Madison, MS is #12 among "Madison"s). app.js
+  // promotes nearby hits from this pool, then caps what the dropdown shows.
+  let results = await geocode(q, 25);
   if (results.length) return results;
 
   let name, qualifier;
@@ -111,7 +115,38 @@ export async function searchPlaces(query) {
     r.region.toLowerCase().startsWith(target) ||
     r.country.toLowerCase() === qualifier.toLowerCase()
   );
-  return (matches.length ? matches : results).slice(0, 6);
+  return (matches.length ? matches : results).slice(0, 12);
+}
+
+/* ---------- local API-call meter (shown in the footer with ?debug) ---------- */
+// Counts only this device's Open-Meteo requests. There is no account or
+// central quota: every visitor calls Open-Meteo from their own IP, and the
+// fair-use limit applies per client, not to the app as a whole.
+
+const USAGE_KEY = 'feelslike:apicalls';
+
+function bumpUsage() {
+  try {
+    const all = JSON.parse(localStorage.getItem(USAGE_KEY) || '{}');
+    const today = new Date().toISOString().slice(0, 10);
+    all[today] = (all[today] || 0) + 1;
+    const cutoff = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    for (const day of Object.keys(all)) if (day < cutoff) delete all[day];
+    localStorage.setItem(USAGE_KEY, JSON.stringify(all));
+  } catch { /* meter is best-effort */ }
+}
+
+export function getUsage() {
+  try {
+    const all = JSON.parse(localStorage.getItem(USAGE_KEY) || '{}');
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    let week = 0;
+    for (const [day, n] of Object.entries(all)) if (day >= weekAgo) week += n;
+    return { today: all[today] || 0, week };
+  } catch {
+    return { today: 0, week: 0 };
+  }
 }
 
 /** Best-effort place name for coordinates (used after browser geolocation). */
@@ -141,6 +176,7 @@ export async function fetchWeather(loc) {
     + `&current=${CURRENT_VARS}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}`
     + `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`
     + `&timezone=auto&forecast_days=7`;
+  bumpUsage();
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`request failed (${res.status})`);
   const data = normalize(await res.json());

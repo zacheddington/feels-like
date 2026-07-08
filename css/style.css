@@ -194,6 +194,9 @@ button {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
   z-index: 30;
   font-size: 0.8rem;
+  max-height: 16.5rem;      /* ~7 rows, then scroll */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .suggestions li {
   padding: 0.55rem 0.8rem;
@@ -206,6 +209,17 @@ button {
   background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 .sug-country { color: var(--muted); font-size: 0.68rem; }
+.sug-near {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  margin-left: 0.6em;
+  vertical-align: 0.1em;
+}
 
 .ghost-btn {
   font-size: 0.72rem;
@@ -579,7 +593,18 @@ button {
 .fb-unit { font-size: 1.05rem; color: var(--muted); }
 #feedbackStatus { color: var(--accent); min-height: 1.1em; margin-top: 0.8rem; }
 
-.chip-backup { color: var(--muted); border-style: dashed; }
+.backup-row { font-size: 0.68rem; line-height: 1.7; max-width: 38rem; margin-bottom: 0.9rem; }
+.footer-link {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: inherit;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  border-bottom: 1px dotted var(--muted);
+  padding-bottom: 0.1em;
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+.footer-link:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.backup-hint { color: var(--muted); font-family: "IBM Plex Mono", ui-monospace, monospace; }
 
 /* ---------- terms (clickable calculation names) ---------- */
 
@@ -611,7 +636,9 @@ button {
 
 /* ---------- calculation modal ---------- */
 
-#calcModal {
+/* Shared frame for every <dialog class="modal"> — keeps them centered and on
+   the current sky palette. New dialogs must use this class. */
+.modal {
   background: var(--bg);
   color: var(--ink);
   border: 1px solid var(--line);
@@ -621,8 +648,10 @@ button {
   padding: 0;
   margin: auto;
 }
-#calcModal[open] { display: flex; flex-direction: column; }
-#calcModal::backdrop { background: rgba(8, 10, 16, 0.55); }
+.modal[open] { display: flex; flex-direction: column; }
+.modal::backdrop { background: rgba(8, 10, 16, 0.55); }
+
+#feedbackModal { width: min(30rem, calc(100vw - 2rem)); }
 
 .modal-head {
   display: flex;
@@ -707,11 +736,26 @@ button {
 
 /* ---------- responsive ---------- */
 
+/* Compact compare on small screens: comparison is about glanceability, so the
+   two panels stay side by side and shrink to essentials — hero number,
+   condition, air temp, and the breakdown ledger. Full detail (charts, week)
+   returns when compare is removed or on a wide screen. */
 @media (max-width: 880px) {
-  .panels.compare { grid-template-columns: 1fr; }
-  .panels.compare .panel:first-child { padding-right: 0; margin-bottom: 2.5rem; }
-  .panels.compare .panel:last-child { border-left: none; padding-left: 0; }
-  .panels.compare .hero-num { font-size: clamp(5rem, 16vw, 9rem); }
+  .panels.compare { grid-template-columns: 1fr 1fr; }
+  .panels.compare .panel:first-child { padding-right: 0.8rem; }
+  .panels.compare .panel:last-child { border-left: 1px solid var(--line); padding-left: 0.8rem; }
+  .panels.compare .place { font-size: 1.05rem; }
+  .panels.compare .region { display: none; }
+  .panels.compare .hero { flex-direction: column; align-items: flex-start; gap: 0.9rem; margin: 0.8rem 0 1.4rem; }
+  .panels.compare .hero-num { font-size: clamp(3.2rem, 13vw, 5.5rem); }
+  .panels.compare .hero-side { padding-bottom: 0; }
+  .panels.compare .meta,
+  .panels.compare .age,
+  .panels.compare .det,
+  .panels.compare .fb-trigger,
+  .panels.compare .block { display: none; }
+  .panels.compare .ledger { font-size: 0.7rem; margin-bottom: 1.2rem; }
+  .panels.compare .ledger .total dd { font-size: 1.2rem; }
 }
 
 @media (max-width: 640px) {

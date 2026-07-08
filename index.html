@@ -98,12 +98,14 @@
         with it. All the constants live in <code>js/feelslike.js</code>.</p>
       </div>
     </details>
+    <p class="backup-row" id="backupRow" hidden></p>
     <p class="credit">weather data by <a href="https://open-meteo.com/" rel="noopener">open-meteo</a>
       · <a href="./changelog.html">version history</a>
       · built to disagree with your thermometer</p>
+    <p class="credit" id="debugUsage" hidden></p>
   </footer>
 
-  <dialog id="calcModal" aria-labelledby="calcModalTitle">
+  <dialog id="calcModal" class="modal" aria-labelledby="calcModalTitle">
     <div class="modal-head">
       <h3 id="calcModalTitle"></h3>
       <button class="icon-btn" data-close aria-label="Close">✕</button>
@@ -111,7 +113,7 @@
     <div class="modal-body" id="calcModalBody"></div>
   </dialog>
 
-  <dialog id="feedbackModal" aria-labelledby="feedbackTitle">
+  <dialog id="feedbackModal" class="modal" aria-labelledby="feedbackTitle">
     <div class="modal-head">
       <h3 id="feedbackTitle">what does it feel like to you?</h3>
       <button class="icon-btn" data-close aria-label="Close">✕</button>
