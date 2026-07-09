@@ -41,6 +41,7 @@ wind, and damp cold, with a visible breakdown ledger. Hosted on GitHub Pages.
 | `manifest.webmanifest` + `sw.js` + `icons/` | PWA layer: installable, offline-capable (network-first shell, cached last weather) |
 | `tools/audit-contrast.mjs` | Accessibility gate: sweeps every sky × weather × mood palette against the contrast floors |
 | `tools/make-icons.mjs` | Regenerates the PNG icons from code (`node tools/make-icons.mjs`) |
+| `TESTING.md` | **Mandatory pre-deploy test plan — every test must pass before pushing** |
 
 Data flow: search → `api.searchPlaces` → user picks → `api.fetchWeather` →
 `app.loadPanel` stores `{loc, data, status}` in `state.panels[slot]` →
@@ -201,10 +202,18 @@ within a minute or two. `.nojekyll` is committed to skip Jekyll processing.
 
 ## Releasing & the changelog
 
+**MANDATORY: before every deploy, run the full test plan in `TESTING.md`.
+Every test must PASS. If any test fails, do not push — fix it and re-run the
+whole plan.** This is not optional and applies to every change, however small
+(a "tiny" CSS tweak has broken layout before). If you changed `TUNING`, update
+the expected regression/mock numbers in `TESTING.md` and this file together.
+
 The version history page (changelog.html) is generated from the repository:
 tags become version headings, commit messages become the entries under them.
 Releasing is therefore just git hygiene:
 
+0. **Run `TESTING.md` in full — every test must PASS.** (Stated first because
+   it comes first.)
 1. Write the commit message **for end users** — plain-English title, body
    listing what they'll notice. It will be displayed verbatim. Hard-wrapping
    the body is fine: the changelog page unwraps single newlines into spaces
