@@ -123,6 +123,14 @@
       <p class="modal-what">Our number is a formula, and formulas can be argued
         with. Tell us what your skin says — disagreements are exactly the data
         that tunes it.</p>
+      <fieldset class="fb-exposure" id="feedbackExposure" hidden>
+        <legend>right now I'm…</legend>
+        <div class="fb-choices">
+          <label><input type="radio" name="exposure" value="sun" required> in the sun</label>
+          <label><input type="radio" name="exposure" value="shade"> in the shade</label>
+          <label><input type="radio" name="exposure" value="indoors"> indoors</label>
+        </div>
+      </fieldset>
       <label class="fb-row">feels like
         <input id="feedbackTemp" type="number" inputmode="decimal" step="1"
                min="-80" max="150" required>

@@ -39,6 +39,18 @@ function hourLabel(h) {
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
 
+// The location's own local time, straight from the API's ISO string (which is
+// already in that place's timezone via timezone=auto) — never the device
+// clock, so a city across the world reads correctly. e.g. "8:45 PM local".
+function localTimeLabel(iso) {
+  if (!iso || iso.length < 16) return '';
+  let h = parseInt(iso.slice(11, 13), 10);
+  const m = iso.slice(14, 16);
+  const ampm = h < 12 ? 'AM' : 'PM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm} local`;
+}
+
 /* ---------- weather codes (WMO) ---------- */
 
 function condLabel(code) {
@@ -291,7 +303,9 @@ function panelHTML(entry, state, slot) {
   } else if (status === 'error') {
     body = `<p class="panel-note err">${esc(message || 'the weather service is not answering')} — try again in a moment</p>`;
   } else if (data) {
+    const local = localTimeLabel(data.current.time);
     body = `
+      ${local ? `<p class="local-time">${local}</p>` : ''}
       ${heroHTML(entry, state.unit)}
       ${ledgerHTML(data, state.unit)}
       <button class="fb-trigger" data-action="feedback" data-slot="${slot}">disagree with this number?</button>

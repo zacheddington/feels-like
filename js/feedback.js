@@ -37,8 +37,14 @@ export function openFeedback(entry, unit) {
     wind: c.wind_speed_10m,
     radiation: c.shortwave_radiation,
   });
+  // When the sun is part of our number, a shade reporter is really comparing
+  // against the shade counterfactual — ask which one they are, or the data
+  // can't tell "formula runs hot" from "reporter was under a tree".
+  const sun = feel.components.find((comp) => comp.key === 'sun');
+  const sunDelta = sun ? sun.delta : 0;
   pending = {
     unit,
+    askExposure: sunDelta >= 2,
     snapshot: {
       place: `${entry.loc.name}${entry.loc.region ? ', ' + entry.loc.region : ''}`,
       lat: +(+entry.loc.lat).toFixed(2),
@@ -51,6 +57,7 @@ export function openFeedback(entry, unit) {
       radiationWm2: Math.round(c.shortwave_radiation || 0),
       weatherCode: c.weather_code,
       oursF: Math.round(feel.value),
+      shadeF: Math.round(feel.value - sunDelta),
       mock: !!entry.loc.mock || undefined,
     },
   };
@@ -59,14 +66,20 @@ export function openFeedback(entry, unit) {
   const input = document.getElementById('feedbackTemp');
   input.value = '';
   document.getElementById('feedbackStatus').textContent = '';
+  const exposure = document.getElementById('feedbackExposure');
+  exposure.hidden = !pending.askExposure;
+  exposure.disabled = !pending.askExposure; // disabled = exempt from validation
+  for (const r of exposure.querySelectorAll('input[type="radio"]')) r.checked = false;
   dlg.showModal();
   input.focus();
 }
 
 async function submit(feltEntered) {
-  const { unit, snapshot } = pending;
+  const { unit, snapshot, askExposure } = pending;
   const feltF = Math.round(unit === 'C' ? (feltEntered * 9) / 5 + 32 : feltEntered);
-  const payload = { ...snapshot, feltF, enteredAs: `${feltEntered}°${unit}` };
+  const picked = document.querySelector('#feedbackExposure input:checked');
+  const exposure = askExposure ? (picked ? picked.value : 'unspecified') : 'sun-not-a-factor';
+  const payload = { ...snapshot, feltF, enteredAs: `${feltEntered}°${unit}`, exposure };
 
   if (FEEDBACK_FORM.action) {
     const body = new FormData();

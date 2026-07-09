@@ -237,8 +237,16 @@ counting — never blank a panel that has data.
 
 Users can tap "disagree with this number?" under the ledger and enter what it
 feels like to them. The submission carries a full conditions snapshot (air,
-dew point, humidity, wind, radiation, weather code, our value, theirs, place,
-local time) — labeled data for tuning TUNING.
+dew point, humidity, wind, radiation, weather code, our value `oursF`, the
+shade value `shadeF`, theirs `feltF`, place, local time, and `exposure`) —
+labeled data for tuning TUNING.
+
+**Exposure matters for analysis:** `oursF` includes the sun component, so a
+shade reporter is really comparing against `shadeF`. When the sun component
+is ≥ 2°F the dialog requires a sun/shade/indoors choice (`exposure`); below
+that it records `sun-not-a-factor`. When analyzing: compare sun reports to
+`oursF`, shade reports to `shadeF`, and drop `indoors` / `unspecified`. Rows
+from before v1.6 have no exposure field — treat daytime ones as ambiguous.
 
 **The Google Form IS configured** (since v1.5, 2026-07-08) — submissions post
 silently to Zach's form; responses live in the form's Responses tab (a Sheet
