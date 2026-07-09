@@ -97,10 +97,17 @@ The hero also shows a **shade counterfactual** ("in the shade, more like N°")
 whenever the sun component is ≥ 2°F — it's simply `value − sun delta`,
 computed in `heroHTML()` (ui.js), not a separate formula.
 
-**Queued formula idea (do NOT implement without feedback data):** scale
-mugginess by total heat load (air temp + sun) instead of air temp alone —
-matches both "humid shade brings little relief" and "dry sun runs hot"
-reports. Validate against feedback rows first (see The feedback loop).
+**Queued formula ideas (do NOT implement without feedback data):**
+1. Scale mugginess by total heat load (air temp + sun) instead of air temp
+   alone — matches both "humid shade brings little relief" and "dry sun runs
+   hot" reports.
+2. Replace the intuition-tuned mugginess tiers with the **Steadman/BoM
+   apparent-temperature equation** as a peer-reviewed physical backbone (uses
+   actual water-vapor pressure), keeping the sun term layered on top. Our
+   shade numbers already track BoM/NWS within ~2°F, so this is a rigor upgrade
+   more than a numbers change — but validate against feedback rows first and
+   update all regression/mock expected values in the same commit.
+Both validated against feedback data first (see The feedback loop).
 
 ### Regression checks (run in the browser console at the site root)
 
@@ -335,6 +342,13 @@ cleans the URL (see `init()` in app.js).
   ledger row has a modal.
 - **Change what a calculation modal says**: prose/citations live in `ENTRIES`
   in `js/explain.js`. The code block and constants render themselves from the
-  live module — never paste code into the modal text.
+  live module — never paste code into the modal text. An entry with empty
+  `fns: []` shows no code block (used by the `accuracy` entry, which is prose +
+  citations only). Blank lines in a `what` string become separate paragraphs.
+- **The `accuracy` entry** (opened from "why this differs from your phone" at
+  the top of the explainer) is the app's honest positioning statement: it
+  compares against NWS heat index / BoM apparent temp / Humidex, notes those
+  official models disagree by >10°, and deliberately claims *effort toward*
+  accuracy, not certainty. Keep that humility if you edit it.
 - **Add a new weather glyph**: add a path set to `GLYPHS` and map codes in
   `glyphKey()` (WMO weather codes).

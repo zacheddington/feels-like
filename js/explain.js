@@ -95,6 +95,42 @@ const ENTRIES = {
       { label: 'ISO 11079 — cold stress and required clothing insulation (background on wet-cold heat loss)', url: 'https://www.iso.org/standard/38900.html' },
     ],
   },
+  accuracy: {
+    title: 'how accurate is this, really?',
+    what: `Honest answer: no "feels like" number is a measured fact — it's a
+      model of how a body sheds heat, and reasonable models disagree. For a
+      humid 91° afternoon, the U.S. heat index says about 101°, Canada's
+      Humidex says 110°, and Australia's apparent-temperature model says 98° —
+      a twelve-degree spread between official government models, all for the
+      same weather. So when this app's number differs from the one on your
+      phone, neither is simply "wrong."
+
+      What we've done is build from those public, peer-reviewed models rather
+      than around them, and check our work against them. In the shade, our
+      number lands within a degree or two of the heat index and the Australian
+      model in both humid and arid conditions — it isn't inventing anything.
+      Where we deliberately go further is the sun: the standard indexes all
+      assume you're in the shade, but direct sun can add ten degrees or more
+      to what your skin feels, so we measure it and add it (and show you the
+      shade number too).
+
+      We don't claim certainty that ours is the most accurate — the honest
+      claim is that we've combined the best available public science with the
+      one thing those models can't have, real reports from real people
+      standing outside, and used both to get as close as we can. Every
+      adjustment is shown, sourced, and open to being told it's wrong. That
+      last part — the "disagree with this number" button — is how the formula
+      keeps getting better.`,
+    fns: [],
+    tuning: [],
+    cites: [
+      { label: 'NWS — heat index (Rothfusz regression, from Steadman 1979)', url: 'https://www.weather.gov/ama/heatindex' },
+      { label: 'NWS — wind chill (2001 NWS/JAG/TI formula)', url: 'https://www.weather.gov/safety/cold-wind-chill-chart' },
+      { label: 'Australian BoM — apparent temperature (Steadman 1994)', url: 'http://www.bom.gov.au/info/thermal_stress/' },
+      { label: 'Environment Canada — the Humidex', url: 'https://www.canada.ca/en/environment-climate-change/services/seasonal-weather-hazards/warm-season-weather-hazards.html' },
+      { label: 'UTCI — the research-grade thermal comfort index we benchmark against', url: 'https://www.utci.org/' },
+    ],
+  },
   colors: {
     title: 'the colors',
     what: `The background is a sky clock: it follows the sun at the searched
@@ -123,14 +159,21 @@ export function openExplainer(key) {
   const dlg = document.getElementById('calcModal');
   if (!entry || !dlg) return;
 
-  document.getElementById('calcModalTitle').textContent = entry.title;
-  document.getElementById('calcModalBody').innerHTML = `
-    <p class="modal-what">${entry.what}</p>
-    ${tuningBlock(entry.tuning)}
+  // Blank-line-separated paragraphs in `what` render as separate <p>s.
+  const whatHTML = entry.what.trim().split(/\n\s*\n/)
+    .map((p) => `<p class="modal-what">${esc(p.replace(/\s+/g, ' ').trim())}</p>`).join('');
+  // The live-code block only appears for entries that name functions.
+  const codeHTML = entry.fns.length ? `
     <h4>the code running right now</h4>
     <p class="modal-note">Read live from this page's own functions — not a copy.
       If the deployed code changes, so does this.</p>
-    <pre class="modal-code">${esc(entry.fns.map((f) => f.toString()).join('\n\n'))}</pre>
+    <pre class="modal-code">${esc(entry.fns.map((f) => f.toString()).join('\n\n'))}</pre>` : '';
+
+  document.getElementById('calcModalTitle').textContent = entry.title;
+  document.getElementById('calcModalBody').innerHTML = `
+    ${whatHTML}
+    ${tuningBlock(entry.tuning)}
+    ${codeHTML}
     ${entry.cites.length ? `<h4>sources</h4>
       <ul class="modal-cites">${entry.cites.map((c) =>
         `<li><a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.label)}</a></li>`).join('')}</ul>` : ''}
