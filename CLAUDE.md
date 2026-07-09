@@ -226,7 +226,10 @@ Releasing is therefore just git hygiene:
 Weather is fetched per panel on load and then kept fresh automatically:
 silent re-fetch (no loading flash — `loadPanel(slot, loc, { silent: true })`)
 on `visibilitychange` resume when data is >5 min old, plus every 15 min while
-visible. The hero shows "updated N min ago" (re-rendered every 60s). When the
+visible. The hero shows "updated N min ago" as a **tappable refresh button**
+(`{ manual: true }` keeps data visible and shows a spinner). Error panels get
+a **"try again"** button — both use the same `refresh` action, which re-runs
+`loadPanel` for that slot's `loc`, so a 502 is never a dead end. When the
 service worker serves a cached API response offline it sets an
 `X-Feels-Like-Cache: fallback` header; api.js turns that into
 `data._fromCache` and the UI labels it "offline — showing data from N min
@@ -240,6 +243,11 @@ feels like to them. The submission carries a full conditions snapshot (air,
 dew point, humidity, wind, radiation, weather code, our value `oursF`, the
 shade value `shadeF`, theirs `feltF`, place, local time, and `exposure`) —
 labeled data for tuning TUNING.
+
+The felt-temperature input is magnitude-only (`min="0"`) with a `±` sign
+toggle beside it (`#feedbackSign`) — phone number pads have no minus key, so
+the toggle is the only reliable way to report a below-zero feels-like; the
+sign is applied in the submit handler before the °C→°F conversion.
 
 **Exposure matters for analysis:** `oursF` includes the sun component, so a
 shade reporter is really comparing against `shadeF`. When the sun component

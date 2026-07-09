@@ -24,8 +24,12 @@ const render = () => renderAll(state);
 
 async function loadPanel(slot, loc, opts = {}) {
   const prev = state.panels[slot];
-  // Silent refreshes keep the old data on screen instead of flashing a loader
-  if (!opts.silent || !prev || prev.status !== 'ready') {
+  const hasData = prev && prev.status === 'ready';
+  if (opts.manual && hasData) {
+    state.panels[slot] = { ...prev, refreshing: true }; // keep data, show spinner
+    render();
+  } else if (!opts.silent || !hasData) {
+    // Silent refreshes keep the old data on screen instead of flashing a loader
     state.panels[slot] = { loc, status: 'loading' };
     render();
   }
@@ -33,8 +37,8 @@ async function loadPanel(slot, loc, opts = {}) {
     const data = await fetchWeather(loc);
     state.panels[slot] = { loc, data, status: 'ready', fetchedAt: Date.now() };
   } catch (err) {
-    if (opts.silent && prev && prev.status === 'ready') {
-      state.panels[slot] = prev; // keep last data; the age label says the rest
+    if ((opts.silent || opts.manual) && hasData) {
+      state.panels[slot] = { ...prev, refreshing: false }; // keep last good data
     } else {
       state.panels[slot] = { loc, status: 'error', message: err.message };
     }
@@ -216,6 +220,11 @@ document.addEventListener('click', (e) => {
     case 'fav': toggleFavorite(state.panels[slot].loc); break;
     case 'remove': removePanel(slot); break;
     case 'compare': toggleCompareSearch(); break;
+    case 'refresh': {
+      const p = state.panels[slot];
+      if (p && p.loc) loadPanel(slot, p.loc, { manual: true });
+      break;
+    }
     case 'explain': openExplainer(el.dataset.modal); break;
     case 'feedback': openFeedback(state.panels[slot], state.unit); break;
     case 'backup': copyBackupLink(el); break;

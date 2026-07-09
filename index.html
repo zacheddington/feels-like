@@ -131,11 +131,14 @@
           <label><input type="radio" name="exposure" value="indoors"> indoors</label>
         </div>
       </fieldset>
-      <label class="fb-row">feels like
+      <div class="fb-row">
+        <label for="feedbackTemp">feels like</label>
+        <button type="button" id="feedbackSign" class="fb-sign" data-sign="+"
+                aria-label="Toggle above or below zero">+</button>
         <input id="feedbackTemp" type="number" inputmode="decimal" step="1"
-               min="-80" max="150" required>
+               min="0" max="150" required>
         <span class="fb-unit">°<span id="feedbackUnit">F</span></span>
-      </label>
+      </div>
       <button type="submit" class="ghost-btn">send it</button>
       <p class="modal-note" id="feedbackStatus"></p>
       <p class="modal-note">sends the current readings, our number, yours, and

@@ -134,16 +134,24 @@ function currentFeel(data) {
 
 /* ---------- panel pieces ---------- */
 
-function ageLine(entry) {
+const REFRESH_GLYPH = `<svg class="rfsh" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+  aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.6"/><path d="M20 4.5V11h-6.5"/></svg>`;
+
+function ageLine(entry, slot) {
+  if (entry.refreshing) return `<span class="age age-btn spinning">${REFRESH_GLYPH} refreshing…</span>`;
   if (!entry.fetchedAt) return '';
   const mins = Math.round((Date.now() - entry.fetchedAt) / 60000);
   const when = mins < 2 ? 'just now' : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} hr ago`;
-  return entry.data && entry.data._fromCache
-    ? `<span class="age stale">offline — showing data from ${when}</span>`
-    : `<span class="age">updated ${when}</span>`;
+  const label = entry.data && entry.data._fromCache
+    ? `offline — showing data from ${when}`
+    : `updated ${when}`;
+  const stale = entry.data && entry.data._fromCache ? ' stale' : '';
+  return `<button class="age age-btn${stale}" data-action="refresh" data-slot="${slot}"
+    title="refresh now">${REFRESH_GLYPH} ${label}</button>`;
 }
 
-function heroHTML(entry, unit) {
+function heroHTML(entry, unit, slot) {
   const data = entry.data;
   const c = data.current;
   const feel = currentFeel(data);
@@ -164,7 +172,7 @@ function heroHTML(entry, unit) {
       <span class="air-line">thermometer says <strong>${t(c.temperature_2m, unit)}°</strong></span>
       ${shadeLine}
       <span class="meta">dew point ${t(c.dew_point_2m, unit)}° · humidity ${Math.round(c.relative_humidity_2m)}% · wind ${windFmt(c.wind_speed_10m, unit)}</span>
-      ${ageLine(entry)}
+      ${ageLine(entry, slot)}
     </div>
   </div>`;
 }
@@ -301,12 +309,14 @@ function panelHTML(entry, state, slot) {
   if (status === 'loading') {
     body = '<p class="panel-note">reading the air…</p>';
   } else if (status === 'error') {
-    body = `<p class="panel-note err">${esc(message || 'the weather service is not answering')} — try again in a moment</p>`;
+    body = `
+      <p class="panel-note err">${esc(message || 'the weather service is not answering')}</p>
+      <button class="ghost-btn retry-btn" data-action="refresh" data-slot="${slot}">try again</button>`;
   } else if (data) {
     const local = localTimeLabel(data.current.time);
     body = `
       ${local ? `<p class="local-time">${local}</p>` : ''}
-      ${heroHTML(entry, state.unit)}
+      ${heroHTML(entry, state.unit, slot)}
       ${ledgerHTML(data, state.unit)}
       <button class="fb-trigger" data-action="feedback" data-slot="${slot}">disagree with this number?</button>
       <section class="block">

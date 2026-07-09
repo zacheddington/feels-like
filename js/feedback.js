@@ -70,6 +70,8 @@ export function openFeedback(entry, unit) {
   exposure.hidden = !pending.askExposure;
   exposure.disabled = !pending.askExposure; // disabled = exempt from validation
   for (const r of exposure.querySelectorAll('input[type="radio"]')) r.checked = false;
+  const signBtn = document.getElementById('feedbackSign');
+  if (signBtn) { signBtn.dataset.sign = '+'; signBtn.textContent = '+'; }
   dlg.showModal();
   input.focus();
 }
@@ -104,10 +106,29 @@ export function initFeedback() {
   dlg.addEventListener('click', (e) => {
     if (e.target === dlg || e.target.closest('[data-close]')) dlg.close();
   });
+
+  // Sign toggle — phone number pads have no minus key, so a tappable ± is the
+  // only reliable way to report a below-zero feels-like. The input holds the
+  // magnitude; this button owns the sign.
+  const signBtn = document.getElementById('feedbackSign');
+  const tempInput = document.getElementById('feedbackTemp');
+  const setSign = (s) => { signBtn.dataset.sign = s; signBtn.textContent = s === '-' ? '−' : '+'; };
+  if (signBtn) {
+    signBtn.addEventListener('click', () => setSign(signBtn.dataset.sign === '-' ? '+' : '-'));
+  }
+  if (tempInput) {
+    // Desktop keyboards can type a leading minus — fold it into the toggle
+    // instead of letting it fail the min="0" magnitude field.
+    tempInput.addEventListener('input', () => {
+      if (tempInput.value.startsWith('-')) { tempInput.value = tempInput.value.slice(1); setSign('-'); }
+    });
+  }
+
   document.getElementById('feedbackForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const val = parseFloat(document.getElementById('feedbackTemp').value);
-    if (Number.isNaN(val) || !pending) return;
+    const raw = parseFloat(document.getElementById('feedbackTemp').value);
+    if (Number.isNaN(raw) || !pending) return;
+    const val = signBtn && signBtn.dataset.sign === '-' ? -raw : raw;
     const status = document.getElementById('feedbackStatus');
     try {
       status.textContent = await submit(val);
