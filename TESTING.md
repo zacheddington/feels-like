@@ -397,6 +397,33 @@ stub geolocation. Run on `/` after the page has loaded:
 never submits the form), success loads a panel, denial shows a placeholder
 hint that resets itself.
 
+### 5.3c — Reverse geocoding names real places, not county districts
+
+BigDataCloud sometimes puts administrative artifacts ("District 2",
+"Township of …") in its city/locality fields; `reverseName()` must skip them.
+These four fixtures cover every arrangement we've seen in the wild:
+
+```js
+(async () => {
+  const api = await import('/js/api.js?v=' + Date.now());
+  const gl = await api.reverseName(32.5402, -90.0898);  // rural MS: artifact in `city`
+  const ja = await api.reverseName(32.2988, -90.1848);  // urban MS: artifact in `locality`
+  const de = await api.reverseName(39.7392, -104.9903); // clean urban
+  const ks = await api.reverseName(38.8, -99.3);        // artifacts in BOTH -> ZIP fallback
+  const noArtifacts = ![gl, ja, de, ks].some(r => /^(district|precinct|ward|division)\s*\d+|^township/i.test(r.name));
+  return {
+    gluckstadt: { got: gl.name, pass: gl.name === 'Gluckstadt' },
+    jackson:    { got: ja.name, pass: ja.name === 'Jackson' },
+    denver:     { got: de.name, pass: de.name === 'Denver' },
+    kansasZipFallback: { got: ks.name, pass: ks.name === 'Hays' },
+    noArtifactsAnywhere: { pass: noArtifacts },
+  };
+})()
+```
+
+**Expected:** all `pass: true`. (These hit the live BigDataCloud + Zippopotam
+APIs; a network failure is BLOCKED, not FAIL — retry once.)
+
 ### 5.3 — Submit (Enter / search button) loads the top result
 
 ```js
@@ -920,6 +947,7 @@ Mark each PASS / FAIL / BLOCKED. **Deploy only if every row is PASS.**
 | 5.2  | Proximity "nearby" sorting                  |        |
 | 5.3  | Submit loads top result                     |        |
 | 5.3b | "My location" button (stubbed geolocation)  |        |
+| 5.3c | Reverse geocoding skips district artifacts  |        |
 | 6.1  | Favorite star + chip + persistence          |        |
 | 6.2  | Backup link round-trips                     |        |
 | 7.1  | Compare via search and favorite chip        |        |

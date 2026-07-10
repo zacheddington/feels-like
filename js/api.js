@@ -153,10 +153,28 @@ export function getUsage() {
 export async function reverseName(lat, lon) {
   try {
     const j = await getJSON(`${REVERSE}?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
-    return {
-      name: j.city || j.locality || 'My location',
-      region: j.principalSubdivisionCode ? j.principalSubdivisionCode.replace(/^US-/, '') : '',
-    };
+    // BigDataCloud fills `city`/`locality` with whatever admin unit it
+    // resolves, and the roles swap by location: rural coords often get a
+    // county supervisor district ("District 2") in `city` with the real town
+    // in `locality`; urban coords the reverse. Skip administrative artifacts
+    // and take whichever field names an actual place.
+    const artifact = /^((district|precinct|ward|division)\s*\d+|township\b.*)$/i;
+    const isReal = (v) => v && !artifact.test(v.trim());
+    let name = [j.city, j.locality].find(isReal) || '';
+    const subdiv = j.principalSubdivisionCode ? j.principalSubdivisionCode.replace(/^US-/, '') : '';
+    let region = STATE_NAMES[subdiv] || subdiv;
+    if (!name && j.countryCode === 'US' && /^\d{5}$/.test(j.postcode || '')) {
+      // Both fields were artifacts — the ZIP still knows its post-office name
+      try {
+        const z = await getJSON(ZIP + j.postcode);
+        const p = z.places && z.places[0];
+        if (p) {
+          name = p['place name'];
+          region = STATE_NAMES[p['state abbreviation']] || p['state abbreviation'] || region;
+        }
+      } catch { /* fall through to generic label */ }
+    }
+    return { name: name || 'My location', region: name ? region : '' };
   } catch {
     return { name: 'My location', region: '' };
   }

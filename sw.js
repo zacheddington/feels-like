@@ -12,7 +12,7 @@
 // BUMP VERSION ON EVERY RELEASE (see CLAUDE.md "Releasing"): it retires the
 // old cache on activate.
 
-const VERSION = 'v1.9.0';
+const VERSION = 'v1.9.1';
 const CACHE = `feelslike-${VERSION}`;
 
 const SHELL = [
