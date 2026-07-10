@@ -181,18 +181,35 @@ function toggleFavorite(loc) {
 /* ---------- geolocation ---------- */
 
 function geolocate() {
-  if (!navigator.geolocation) { render(); return; }
+  const btn = document.querySelector('.locate-btn');
+  if (!navigator.geolocation) {
+    hintPlaceholder('location not supported on this device');
+    render();
+    return;
+  }
   state.locating = true;
+  if (btn) btn.classList.add('locating');
   render();
   navigator.geolocation.getCurrentPosition(async (pos) => {
     state.locating = false;
+    if (btn) btn.classList.remove('locating');
     const { latitude: lat, longitude: lon } = pos.coords;
     const named = await reverseName(lat, lon);
     loadPanel(0, { name: named.name, region: named.region, lat, lon });
   }, () => {
+    // Denied or unavailable — an explicit button press deserves a visible answer
     state.locating = false;
+    if (btn) btn.classList.remove('locating');
+    hintPlaceholder('location unavailable — check permissions');
     render();
   }, { timeout: 8000, maximumAge: 600000 });
+}
+
+let hintTimer;
+function hintPlaceholder(msg) {
+  clearTimeout(hintTimer);
+  input.placeholder = msg;
+  hintTimer = setTimeout(() => { input.placeholder = 'city or ZIP code'; }, 3500);
 }
 
 /* ---------- global events ---------- */

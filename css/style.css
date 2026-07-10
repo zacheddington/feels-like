@@ -184,6 +184,8 @@ button {
 .search-btn:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .search:focus-within .search-btn { border-bottom-color: var(--accent); }
 
+.locate-btn.locating svg { animation: breathe 1.2s ease-in-out infinite; }
+
 .suggestions {
   position: absolute;
   top: calc(100% + 4px);

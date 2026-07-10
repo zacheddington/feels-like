@@ -364,6 +364,39 @@ Load a primary city first, then search a common name:
 **Expected:** all `pass: true` — with Jackson, MS on screen, searching "Madison"
 floats a nearby (Deep-South) Madison to the top with a "nearby" tag.
 
+### 5.3b — "My location" button (stubbed geolocation)
+
+The location-arrow button beside the magnifier loads the device's location as
+the primary panel. Headless browsers can't grant the permission prompt, so
+stub geolocation. Run on `/` after the page has loaded:
+
+```js
+(async () => {
+  const out = {};
+  const btn = document.querySelector('.locate-btn');
+  out.buttonExists = { pass: !!btn && btn.getAttribute('data-action') === 'geolocate' && btn.type === 'button' };
+  const geo = navigator.geolocation;
+  const orig = geo.getCurrentPosition.bind(geo);
+  // success path (Denver coords) -> loads a panel
+  geo.getCurrentPosition = (ok) => ok({ coords: { latitude: 39.74, longitude: -104.99 } });
+  btn.click();
+  await new Promise(r => setTimeout(r, 5000)); // reverse-geocode + forecast are real network
+  out.loadsPanel = { pass: document.querySelectorAll('.panel').length >= 1 && !!document.querySelector('.hero-num') };
+  // failure path (denied) -> visible hint in the search placeholder
+  geo.getCurrentPosition = (ok, err) => err({ code: 1 });
+  btn.click();
+  await new Promise(r => setTimeout(r, 300));
+  out.failureHint = { pass: /location/i.test(document.querySelector('#searchInput').placeholder) };
+  geo.getCurrentPosition = orig;
+  await new Promise(r => setTimeout(r, 3600)); // let the hint reset
+  return out;
+})()
+```
+
+**Expected:** all `pass: true` — button exists (and is `type="button"` so it
+never submits the form), success loads a panel, denial shows a placeholder
+hint that resets itself.
+
 ### 5.3 — Submit (Enter / search button) loads the top result
 
 ```js
@@ -493,9 +526,15 @@ is stripped from the URL.
   const panels = document.querySelectorAll('.panels.compare .panel');
   if (panels.length !== 2) return { pass: false, reason: 'not two panels' };
   const a = panels[0].getBoundingClientRect(), b = panels[1].getBoundingClientRect();
+  // NOTE: the chart element still EXISTS in the DOM — its parent .block is
+  // display:none. Test visibility by rendered size, never by existence or by
+  // the chart's own computed display (a child of display:none keeps its own
+  // specified display value).
+  const chart = document.querySelector('.panels.compare .chart');
+  const chartHidden = !chart || (chart.getBoundingClientRect().width === 0 && chart.getBoundingClientRect().height === 0);
   return {
     sideBySide:    { pass: Math.abs(a.top - b.top) < 40 && b.left > a.left }, // same row, second to the right
-    chartsHidden:  { pass: !document.querySelector('.panels.compare .chart') }, // hidden on small compare
+    chartsHidden:  { pass: chartHidden }, // hidden on small compare
     bothNumbers:   { pass: document.querySelectorAll('.hero-num').length === 2 },
   };
 })()
@@ -880,6 +919,7 @@ Mark each PASS / FAIL / BLOCKED. **Deploy only if every row is PASS.**
 | 5.1  | City / ZIP / qualified search               |        |
 | 5.2  | Proximity "nearby" sorting                  |        |
 | 5.3  | Submit loads top result                     |        |
+| 5.3b | "My location" button (stubbed geolocation)  |        |
 | 6.1  | Favorite star + chip + persistence          |        |
 | 6.2  | Backup link round-trips                     |        |
 | 7.1  | Compare via search and favorite chip        |        |

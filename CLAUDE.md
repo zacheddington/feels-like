@@ -301,6 +301,11 @@ cleans the URL (see `init()` in app.js).
 - **Every `<dialog>` must carry `class="modal"`** — that class provides the
   centered, sky-palette frame. A dialog without it renders unstyled at the
   top-left (this was a real shipped bug).
+- The search bar has three buttons: the magnifier (form submit), and the
+  location arrow (`.locate-btn`, `data-action="geolocate"`, `type="button"` so
+  it never submits the form) which reloads the device's location as the
+  primary panel. Geolocation failures surface via `hintPlaceholder()` — a
+  temporary message in the search placeholder — never silently.
 - Compare mode: while a compare pick is pending (`state.searchTarget === 1`),
   favorite chips fill slot 1 instead of slot 0. On screens ≤880px, compare
   renders two condensed side-by-side columns (charts/week/meta hidden via the
