@@ -71,7 +71,8 @@ const ENTRIES = {
       no longer applies, so moving air is modeled as evaporative cooling: the
       benefit grows with wind speed but shrinks as dew point rises, because a
       hot muggy wind barely helps. Between 50°F and 65°F the two models are
-      blended linearly so the number never jumps at a boundary.`,
+      blended linearly, and below 3 mph the effect ramps smoothly to zero —
+      the number never jumps at any boundary.`,
     fns: [windEffect, nwsChillDelta, warmWindDelta],
     tuning: ['CHILL_TEMP', 'WARM_WIND_TEMP', 'CHILL_MIN_WIND', 'WIND_WARM_EXP', 'WIND_WARM_RATE', 'WIND_WARM_CAP', 'WIND_DRYNESS_FLOOR'],
     cites: [

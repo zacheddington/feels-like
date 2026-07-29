@@ -98,7 +98,13 @@ export function warmWindDelta(wind, dewPoint) {
 }
 
 export function windEffect(temp, wind, dewPoint) {
-  if (!wind || wind < TUNING.CHILL_MIN_WIND) return 0;
+  if (!wind || wind <= 0) return 0;
+  // NWS defines wind chill only above CHILL_MIN_WIND (3 mph). Below that,
+  // ramp the 3-mph value down to zero instead of switching off — otherwise
+  // the ledger's wind row pops in and out as a breeze flutters around 3 mph.
+  if (wind < TUNING.CHILL_MIN_WIND) {
+    return windEffect(temp, TUNING.CHILL_MIN_WIND, dewPoint) * (wind / TUNING.CHILL_MIN_WIND);
+  }
   if (temp <= TUNING.CHILL_TEMP) return nwsChillDelta(temp, wind);
   if (temp >= TUNING.WARM_WIND_TEMP) return warmWindDelta(wind, dewPoint);
   const t = (temp - TUNING.CHILL_TEMP) / (TUNING.WARM_WIND_TEMP - TUNING.CHILL_TEMP);

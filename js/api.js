@@ -106,9 +106,6 @@ export async function searchPlaces(query) {
   }
   if (!name || !qualifier) return [];
 
-  // Fetch a deep result set: the geocoder ranks by population, so a small
-  // town like Madison, MS never appears in the top handful of "Madison"s.
-  // The qualifier filter is what surfaces it.
   results = await geocode(name, 100);
   const target = (US_STATES[qualifier.toLowerCase()] || qualifier).toLowerCase();
   const matches = results.filter((r) =>
@@ -153,16 +150,22 @@ export function getUsage() {
 export async function reverseName(lat, lon) {
   try {
     const j = await getJSON(`${REVERSE}?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
-    // BigDataCloud fills `city`/`locality` with whatever admin unit it
-    // resolves, and the roles swap by location: rural coords often get a
-    // county supervisor district ("District 2") in `city` with the real town
-    // in `locality`; urban coords the reverse. Skip administrative artifacts
-    // and take whichever field names an actual place.
+    // BigDataCloud fills `city`/`locality` with whatever admin units it
+    // resolves — and the SAME coordinates can answer differently between
+    // requests (observed: city flipping between "District 4" and "Canton",
+    // the county seat, for a Gluckstadt address). `locality` is the finer
+    // field, so prefer it when it names a real place; skip administrative
+    // artifacts ("District 2", "Township of …"); fall back to `city`, then
+    // to the ZIP's post-office name below.
     const artifact = /^((district|precinct|ward|division)\s*\d+|township\b.*)$/i;
     const isReal = (v) => v && !artifact.test(v.trim());
-    let name = [j.city, j.locality].find(isReal) || '';
-    const subdiv = j.principalSubdivisionCode ? j.principalSubdivisionCode.replace(/^US-/, '') : '';
-    let region = STATE_NAMES[subdiv] || subdiv;
+    let name = [j.locality, j.city].find(isReal) || '';
+    // US: spell the state out. Elsewhere: use the subdivision's full name —
+    // codes like "CA-ON" are not something a person should ever read.
+    const code = j.principalSubdivisionCode || '';
+    let region = code.startsWith('US-')
+      ? (STATE_NAMES[code.slice(3)] || code.slice(3))
+      : (j.principalSubdivision || '');
     if (!name && j.countryCode === 'US' && /^\d{5}$/.test(j.postcode || '')) {
       // Both fields were artifacts — the ZIP still knows its post-office name
       try {

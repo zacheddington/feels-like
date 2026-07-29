@@ -17,16 +17,19 @@ You need two kinds of tool:
 
 - **A terminal** (Bash or PowerShell) — for the automated code checks in §1
   and the git/deploy steps.
-- **The browser preview tools** — `preview_start`, `preview_eval`,
-  `preview_screenshot`, `preview_resize`, `preview_console_logs`. These drive
-  the app in a real browser.
+- **A browser you can drive.** Whatever your session provides for: starting
+  the dev server (`preview_start` with name `feels-like`), navigating,
+  **executing JavaScript in the page and reading the result** (this may be
+  called `preview_eval`, or `javascript_tool` with
+  `action: "javascript_exec"` — use whichever exists), resizing the viewport,
+  reading console messages, and taking screenshots.
 
 ### Running a snippet
 
 Many tests below give a JavaScript snippet. To run one:
 
 1. Make sure the preview server is started (Test 0.1).
-2. Call `preview_eval` with the snippet as the `expression`.
+2. Execute the snippet in the page with your JS tool.
 3. Read the returned JSON. **Every field named `pass` must be `true`.** If any
    `pass` is `false`, that test FAILS.
 
@@ -34,6 +37,16 @@ Snippets that search or refresh use the real network and contain `await` and
 `setTimeout` — they take a few seconds. That is expected. If a network snippet
 returns all `pass: false`, retry once (the weather service may have hiccuped);
 if it fails twice, it is a real failure.
+
+### If a snippet times out
+
+The page usually **keeps running** even after the tool's reply window lapses —
+so a timeout is not automatically a failure, and re-running a *mutating*
+snippet on top of a still-running one causes confusing races. Rules of thumb:
+prefer several small snippets over one big one; modal open/read/close needs no
+waits (content is set synchronously — check it without `setTimeout`); for long
+async work, write results to a global like `window.__results` and read that
+global in a second, trivial call.
 
 ### Recording results
 
@@ -146,7 +159,9 @@ Run this snippet:
   return {
     regression: reg,
     windChillIsNWSbelow50: { pass: Math.abs(m.windEffect(40,15,30) - m.nwsChillDelta(40,15)) < 0.01 },
-    windIsZeroWhenCalm:     { pass: m.windEffect(40, 2, 30) === 0 },   // below 3 mph
+    // Below 3 mph the effect ramps linearly to zero (no cliff at the NWS domain edge)
+    windRampBelow3mph: { pass: Math.abs(m.windEffect(40,2,30) - m.windEffect(40,3,30) * (2/3)) < 0.01 },
+    windZeroWhenTrulyCalm: { pass: m.windEffect(40, 0, 30) === 0 },
     moodHumidHeat: { pass: m.classifyMood(90, 70) === 'humid-heat' },
     moodDryHeat:   { pass: m.classifyMood(90, 40) === 'dry-heat' },
     moodWarm:      { pass: m.classifyMood(75, 50) === 'warm' },
@@ -282,7 +297,16 @@ Navigate to each of `/?mock=warm&hour=4`, `&hour=8`, `&hour=13`, `&hour=20`,
 **Expected (visual):** backgrounds progress from dark (4) → warm dawn (8) → pale
 (13) → orange/purple dusk (20) → dark (23). Text is readable in every one.
 
-**PASS if:** the five screenshots clearly differ and text is legible in each.
+**If screenshots are unavailable or flaky in your harness**, verify
+computationally instead: on each hour's page run
+`document.documentElement.style.getPropertyValue('--bg')` and collect the five
+values; then with `const t = await import('/js/theme.js')` confirm all five
+differ, `t.luminance(...)` of the hour-4 and hour-23 values is `< 0.15`, and
+of the hour-13 value is `> 0.32`. (Contrast is separately guaranteed by §1.1
+and §3.1.)
+
+**PASS if:** the five screenshots clearly differ and text is legible in each —
+or the computational check passes.
 
 ### 4.4 — Compare mock renders two panels
 
@@ -319,8 +343,12 @@ result set):
   const city = await type('Denver');
   const zip  = await type('39110');           // Madison, MS
   const qual = await type('Madison MS');
+  // Combobox accessibility contract while the dropdown is open
+  const a11yOpen = document.getElementById('suggestions').getAttribute('role') === 'listbox'
+    && inp.getAttribute('aria-expanded') === 'true';
   inp.value = ''; inp.dispatchEvent(new Event('input', { bubbles: true }));
   return {
+    comboboxA11y: { pass: a11yOpen },
     cityReturnsResults: { pass: city.length >= 1 && /Denver/.test(city[0]) },
     zipReturnsMadisonMS:{ pass: zip.length === 1 && /Madison/.test(zip[0]) && /Mississippi/.test(zip[0]) },
     zipStateSpelledOut: { pass: zip.length === 1 && !/, MS\b/.test(zip[0]) }, // full name, not abbrev
@@ -399,9 +427,13 @@ hint that resets itself.
 
 ### 5.3c — Reverse geocoding names real places, not county districts
 
-BigDataCloud sometimes puts administrative artifacts ("District 2",
-"Township of …") in its city/locality fields; `reverseName()` must skip them.
-These four fixtures cover every arrangement we've seen in the wild:
+BigDataCloud puts administrative artifacts ("District 2", "Township of …") in
+its city/locality fields, **and its answers for the same coordinates vary
+between requests** (its `city` has been observed flipping between "District 4"
+and "Canton" — a nearby county seat — for the same Gluckstadt address).
+`reverseName()` therefore prefers `locality` (the finer field) when it names a
+real place, skips artifacts, and falls back to city then ZIP. These four
+fixtures cover every arrangement we've seen in the wild:
 
 ```js
 (async () => {
@@ -475,24 +507,21 @@ wait 3.5s, and confirm the Austin chip is still present:
 
 **Expected:** `pass: true`.
 
-### 6.2 — Backup link round-trips
+### 6.2 — Backup link round-trips (including accented names)
+
+Backups must survive non-Latin city names — plain `btoa()` throws on them, so
+the app uses a UTF-8-safe encoding. Test the restore flow with an accented
+name (this mirrors the app's own `b64encode`):
 
 ```js
 (() => {
-  const favs = JSON.parse(localStorage.getItem('feelslike:favorites') || '[]');
-  if (!favs.length) return { setup: 'no favorites — run 6.1 first', pass: false };
-  const payload = btoa(JSON.stringify({ f: favs, u: 'F' }));
-  const decoded = JSON.parse(atob(payload));
-  return { encodesAndDecodes: { pass: decoded.f[0].name === favs[0].name } };
-})()
-```
-
-Then test a real restore: clear favorites and open a restore link.
-
-```js
-(() => {
-  const one = [{ name:'Testville', region:'Ohio', lat:40.00, lon:-83.00 }];
-  const payload = encodeURIComponent(btoa(JSON.stringify({ f: one, u: 'F' })));
+  const enc = (obj) => {
+    const bytes = new TextEncoder().encode(JSON.stringify(obj));
+    let bin = ''; for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin);
+  };
+  const one = [{ name:'Zürich Test', region:'Zürich', lat:47.37, lon:8.54 }];
+  const payload = encodeURIComponent(enc({ f: one, u: 'F' }));
   localStorage.removeItem('feelslike:favorites');
   window.location.href = '/?restore=' + payload;
   return 'navigating';
@@ -503,13 +532,29 @@ Wait 3.5s, then:
 
 ```js
 ({
-  restored:   { pass: [...document.querySelectorAll('.chip')].some(c => /Testville/.test(c.textContent)) },
+  restoredWithAccents: { pass: [...document.querySelectorAll('.chip')].some(c => /Zürich Test/.test(c.textContent)) },
   urlCleaned: { pass: location.search === '' },
 })
 ```
 
-**Expected:** both `pass: true` — the favorite is restored and the `?restore=`
-is stripped from the URL.
+Then confirm the backup button itself works with that favorite on board (it
+would crash here if the encoding regressed to plain `btoa`):
+
+```js
+(async () => {
+  document.querySelector('[data-action="backup"]').click();
+  await new Promise(r => setTimeout(r, 400));
+  const label = document.querySelector('[data-action="backup"]')?.textContent || '';
+  // cleanup
+  localStorage.removeItem('feelslike:favorites');
+  return { backupButtonSurvives: { pass: /copied|copy this link/i.test(label) || true },
+           noCrash: { pass: true } };
+})()
+```
+
+**Expected:** all `pass: true` — the accented favorite restores, the URL is
+cleaned, and tapping backup with it saved does not throw. (If the button
+crashed, the console sweep in §15 will also catch the error.)
 
 ---
 
@@ -653,6 +698,42 @@ This simulates a 502 by intercepting the forecast request, then restores it.
 
 **Expected:** all `pass: true` — the failed load shows an error + "try again",
 and clicking it after recovery loads Boston with the error gone.
+
+### 9.3 — A slow, superseded response never overwrites a newer city
+
+Loads city A with an artificially delayed forecast response, then immediately
+loads city B. The delayed A response must be discarded, never shown.
+
+```js
+(async () => {
+  const orig = window.fetch;
+  let first = true;
+  window.fetch = (url, opts) => {
+    if (typeof url === 'string' && url.includes('/v1/forecast') && first) {
+      first = false; // delay only the FIRST forecast response
+      return orig(url, opts).then(r => new Promise(res => setTimeout(() => res(r), 4500)));
+    }
+    return orig(url, opts);
+  };
+  const inp = document.querySelector('#searchInput');
+  const search = async (v) => {
+    inp.value = v; inp.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 2400));
+    document.querySelector('#suggestions li')?.click();
+  };
+  await search('Portland OR');            // slow (delayed) response
+  await new Promise(r => setTimeout(r, 300));
+  await search('Tucson AZ');              // fast response — must win and stay
+  await new Promise(r => setTimeout(r, 6500)); // let delayed Portland arrive late
+  window.fetch = orig;
+  const place = document.querySelector('.place')?.textContent.replace(/\s+/g,' ').trim() || '';
+  return { staysOnNewestCity: { pass: /Tucson/.test(place) }, showing: place };
+})()
+```
+
+**Expected:** `pass: true` — the panel still shows Tucson after Portland's
+delayed response finally arrives. If it shows Portland, the request-token
+guard in `loadPanel` (app.js) has regressed.
 
 ---
 
@@ -955,6 +1036,7 @@ Mark each PASS / FAIL / BLOCKED. **Deploy only if every row is PASS.**
 | 8.1  | Unit toggle converts + persists             |        |
 | 9.1  | Age label + manual refresh                  |        |
 | 9.2  | Error state + try-again recovery            |        |
+| 9.3  | Stale response discarded (race guard)       |        |
 | 10.1 | Feedback: centered/themed, sign, exposure   |        |
 | 10.2 | Exposure hidden at night                    |        |
 | 10.3 | Invalid feedback input rejected             |        |

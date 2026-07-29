@@ -87,15 +87,20 @@ Every constant is in the exported `TUNING` object — tune there, nowhere else.
   (WC = 35.74 + 0.6215T − 35.75V^0.16 + 0.4275TV^0.16), applied strictly in
   its defined domain — air temp ≤ 50°F and wind ≥ 3 mph. At ≥ 65°F an
   evaporative-cooling model applies instead (wind helps more when the air is
-  dry); between 50–65°F the two are blended linearly so there is no seam.
+  dry); between 50–65°F the two are blended linearly, and below 3 mph the
+  3-mph value ramps linearly to zero — no seams or cliffs anywhere. (The
+  regression values are unaffected: all three cases use wind ≥ 3 mph.)
 - **Damp cold**: RH >70% below 55°F → penalty (max −5).
 
 `computeFeelsLike(obs)` returns `{ value, air, components }`; components with
 |delta| < 0.5°F are dropped from the ledger.
 
 The hero also shows a **shade counterfactual** ("in the shade, more like N°")
-whenever the sun component is ≥ 2°F — it's simply `value − sun delta`,
-computed in `heroHTML()` (ui.js), not a separate formula.
+whenever the sun component is ≥ 2°F. It is displayed as
+`round(value) − round(sun delta)` — NOT `round(value − sun delta)` — so the
+arithmetic a reader does with the visible hero and ledger numbers always
+checks out. Keep it that way: raw rounding once made the shade number equal
+the air number while a −1 breeze row was showing, which reads as a bug.
 
 **Queued formula ideas (do NOT implement without feedback data):**
 1. Scale mugginess by total heat load (air temp + sun) instead of air temp
@@ -306,6 +311,16 @@ cleans the URL (see `init()` in app.js).
   it never submits the form) which reloads the device's location as the
   primary panel. Geolocation failures surface via `hintPlaceholder()` — a
   temporary message in the search placeholder — never silently.
+- The search input is an ARIA combobox: `renderSuggestions()` maintains
+  `aria-expanded` and `aria-activedescendant` on the input, and the list is a
+  `role="listbox"` of `role="option"` items with ids. Don't strip these when
+  touching suggestion rendering.
+- `loadPanel` is race-guarded: every call stamps the slot with a `reqId` and a
+  completing fetch commits only if its stamp is still current (TESTING.md
+  §9.3 exercises this). Any new code path that loads panels must go through
+  `loadPanel`, not fetch-and-assign directly.
+- Backup links use the UTF-8-safe `b64encode`/`b64decode` pair in app.js —
+  never plain `btoa`/`atob`, which throw on accented city names.
 - Compare mode: while a compare pick is pending (`state.searchTarget === 1`),
   favorite chips fill slot 1 instead of slot 0. On screens ≤880px, compare
   renders two condensed side-by-side columns (charts/week/meta hidden via the
@@ -320,7 +335,11 @@ cleans the URL (see `init()` in app.js).
 
 - The app is installable (Add to Home Screen) and works offline: `sw.js`
   serves the shell network-first (fresh when online, cached when not) and
-  falls back to the last cached weather-API responses offline.
+  falls back to the last cached forecast responses offline. Transient lookups
+  (geocoding, ZIP, reverse-geocode hosts in `PASSTHROUGH_HOSTS`) bypass the
+  SW entirely — they have no offline value — and cached forecasts are pruned
+  to the newest `MAX_FORECAST_ENTRIES` (10) so the cache can't grow without
+  bound.
 - iOS specifics already handled — don't regress them: `viewport-fit=cover` +
   `env(safe-area-inset-*)` body padding, `html` background painted (prevents
   unpainted status-bar/overscroll bands), fixed overlays overdrawn past the

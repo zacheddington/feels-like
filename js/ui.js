@@ -157,9 +157,13 @@ function heroHTML(entry, unit, slot) {
   const feel = currentFeel(data);
   // The shade counterfactual: the same number minus the sun's contribution.
   // Only shown when the sun is actually part of the story (≥ 2°F).
+  // Displayed as round(total) − round(sun) rather than round(total − sun), so
+  // the arithmetic a reader does with the visible numbers always checks out
+  // (raw rounding once made shade equal air while a −1 breeze was showing).
   const sun = feel.components.find((comp) => comp.key === 'sun');
+  const shadeShownF = sun ? Math.round(feel.value) - Math.round(sun.delta) : 0;
   const shadeLine = sun && sun.delta >= 2
-    ? `<span class="shade-line">in the shade, more like <strong>${t(feel.value - sun.delta, unit)}°</strong></span>`
+    ? `<span class="shade-line">in the shade, more like <strong>${t(shadeShownF, unit)}°</strong></span>`
     : '';
   return `
   <div class="hero">
@@ -348,17 +352,24 @@ function panelHTML(entry, state, slot) {
 
 export function renderSuggestions(state) {
   const ul = document.getElementById('suggestions');
+  const input = document.getElementById('searchInput');
   if (!state.suggestions.length) {
     ul.hidden = true;
     ul.innerHTML = '';
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
     return;
   }
   ul.hidden = false;
   ul.innerHTML = state.suggestions.map((p, i) => `
-    <li class="${i === state.selIdx ? 'sel' : ''}" data-action="pick" data-idx="${i}" role="option">
+    <li id="sug-${i}" class="${i === state.selIdx ? 'sel' : ''}" data-action="pick" data-idx="${i}"
+      role="option" aria-selected="${i === state.selIdx}">
       <span>${esc(p.name)}${p.region ? `, ${esc(p.region)}` : ''}${p.near ? '<span class="sug-near">nearby</span>' : ''}</span>
       <span class="sug-country">${esc(p.country)}</span>
     </li>`).join('');
+  input.setAttribute('aria-expanded', 'true');
+  if (state.selIdx >= 0) input.setAttribute('aria-activedescendant', `sug-${state.selIdx}`);
+  else input.removeAttribute('aria-activedescendant');
   const sel = ul.querySelector('.sel');
   if (sel) sel.scrollIntoView({ block: 'nearest' });
 }
@@ -430,10 +441,13 @@ export function renderAll(state) {
     }
   }
 
-  // Unit toggle
+  // Unit toggle — the active unit is conveyed by color for sighted users;
+  // the label carries the state for everyone else.
   document.querySelectorAll('#unitToggle [data-unit]').forEach((el) => {
     el.classList.toggle('active', el.dataset.unit === state.unit);
   });
+  document.getElementById('unitToggle').setAttribute('aria-label',
+    `Temperature units: ${state.unit === 'F' ? 'Fahrenheit' : 'Celsius'}. Activate to switch.`);
 
   document.title = panels[0]
     ? `Feels Like — ${panels[0].loc.name}`

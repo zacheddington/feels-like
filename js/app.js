@@ -22,27 +22,47 @@ const render = () => renderAll(state);
 
 /* ---------- loading panels ---------- */
 
+// Each load stamps the slot with a fresh id; a completing fetch only commits
+// if its stamp is still the slot's current one. This is what stops a slow,
+// superseded response from overwriting a newer city, and stops an in-flight
+// fetch from resurrecting a panel that was removed (removePanel splices the
+// array, so the stamp at the old index no longer matches).
+let loadSeq = 0;
+
+function friendlyError(err) {
+  const status = /request failed \((\d+)\)/.exec(err?.message || '');
+  if (status) return `the weather service returned an error (${status[1]})`;
+  if (err?.name === 'TimeoutError' || /timed? ?out/i.test(err?.message || '')) {
+    return 'the weather service is taking too long';
+  }
+  return 'can’t reach the weather service';
+}
+
 async function loadPanel(slot, loc, opts = {}) {
+  const reqId = ++loadSeq;
   const prev = state.panels[slot];
   const hasData = prev && prev.status === 'ready';
   if (opts.manual && hasData) {
-    state.panels[slot] = { ...prev, refreshing: true }; // keep data, show spinner
+    state.panels[slot] = { ...prev, refreshing: true, reqId }; // keep data, show spinner
     render();
   } else if (!opts.silent || !hasData) {
-    // Silent refreshes keep the old data on screen instead of flashing a loader
-    state.panels[slot] = { loc, status: 'loading' };
+    state.panels[slot] = { loc, status: 'loading', reqId };
     render();
+  } else {
+    // Silent refresh: no visual change, but take ownership of the slot
+    state.panels[slot] = { ...prev, reqId };
   }
+  let result;
   try {
     const data = await fetchWeather(loc);
-    state.panels[slot] = { loc, data, status: 'ready', fetchedAt: Date.now() };
+    result = { loc, data, status: 'ready', fetchedAt: Date.now(), reqId };
   } catch (err) {
-    if ((opts.silent || opts.manual) && hasData) {
-      state.panels[slot] = { ...prev, refreshing: false }; // keep last good data
-    } else {
-      state.panels[slot] = { loc, status: 'error', message: err.message };
-    }
+    result = (opts.silent || opts.manual) && hasData
+      ? { ...prev, refreshing: false, reqId }  // keep last good data
+      : { loc, status: 'error', message: friendlyError(err), reqId };
   }
+  if (state.panels[slot]?.reqId !== reqId) return; // superseded or removed
+  state.panels[slot] = result;
   store.setActive(state.panels.filter(Boolean).map((p) => p.loc));
   render();
 }
@@ -82,9 +102,16 @@ function removePanel(slot) {
 
 let debounceTimer;
 
+function defaultPlaceholder() {
+  if (state.searchTarget === 1) {
+    return state.favorites.length ? 'compare with… (or tap a favorite)' : 'compare with…';
+  }
+  return 'city or ZIP code';
+}
+
 function resetSearch() {
   input.value = '';
-  input.placeholder = 'city or ZIP code';
+  input.placeholder = defaultPlaceholder();
   state.suggestions = [];
   state.selIdx = -1;
   renderSuggestions(state);
@@ -94,7 +121,9 @@ function pick(place) {
   const slot = state.searchTarget;
   state.searchTarget = 0;
   resetSearch();
-  loadPanel(slot, place);
+  const clean = { ...place };
+  delete clean.near; // display-only proximity tag — keep it out of storage
+  loadPanel(slot, clean);
 }
 
 // People usually search for places near the one they're already looking at:
@@ -209,7 +238,7 @@ let hintTimer;
 function hintPlaceholder(msg) {
   clearTimeout(hintTimer);
   input.placeholder = msg;
-  hintTimer = setTimeout(() => { input.placeholder = 'city or ZIP code'; }, 3500);
+  hintTimer = setTimeout(() => { input.placeholder = defaultPlaceholder(); }, 3500);
 }
 
 /* ---------- global events ---------- */
@@ -249,8 +278,22 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// UTF-8-safe base64 — plain btoa() throws on any non-Latin-1 character, so a
+// favorite named "Zürich" or "São Paulo" would crash the backup button.
+function b64encode(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function b64decode(str) {
+  const bytes = Uint8Array.from(atob(str), (ch) => ch.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
 function copyBackupLink(btn) {
-  const payload = encodeURIComponent(btoa(JSON.stringify({ f: state.favorites, u: state.unit })));
+  const payload = encodeURIComponent(b64encode({ f: state.favorites, u: state.unit }));
   const url = `${location.origin}${location.pathname}?restore=${payload}`;
   const done = () => { btn.textContent = 'link copied — save it somewhere'; setTimeout(render, 2000); };
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -266,9 +309,7 @@ function toggleCompareSearch() {
     resetSearch();
   } else {
     state.searchTarget = 1;
-    input.placeholder = state.favorites.length
-      ? 'compare with… (or tap a favorite)'
-      : 'compare with…';
+    input.placeholder = defaultPlaceholder();
     input.focus();
   }
   render();
@@ -294,11 +335,12 @@ function init() {
   const params = new URLSearchParams(location.search);
   state.debug = params.has('debug');
 
-  // ?restore=<payload> — favorites backup link (see copyBackupLink)
+  // ?restore=<payload> — favorites backup link (see copyBackupLink).
+  // b64decode also reads old plain-btoa links: ASCII decodes identically.
   const restore = params.get('restore');
   if (restore) {
     try {
-      const saved = JSON.parse(atob(restore));
+      const saved = b64decode(restore);
       const have = new Set(state.favorites.map(store.locKey));
       for (const f of saved.f || []) {
         if (f && f.lat != null && !have.has(store.locKey(f))) state.favorites.push(f);

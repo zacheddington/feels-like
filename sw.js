@@ -12,7 +12,7 @@
 // BUMP VERSION ON EVERY RELEASE (see CLAUDE.md "Releasing"): it retires the
 // old cache on activate.
 
-const VERSION = 'v1.9.1';
+const VERSION = 'v1.10.0';
 const CACHE = `feelslike-${VERSION}`;
 
 const SHELL = [
@@ -51,11 +51,29 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Keep only the newest few forecast responses — every distinct lat/lon is a
+// distinct URL, so without pruning the cache grows with every place a user
+// has ever looked at.
+const MAX_FORECAST_ENTRIES = 10;
+
+async function pruneForecasts(cache) {
+  const keys = await cache.keys();
+  const forecasts = keys.filter((r) => new URL(r.url).hostname === 'api.open-meteo.com');
+  if (forecasts.length > MAX_FORECAST_ENTRIES) {
+    await Promise.all(
+      forecasts.slice(0, forecasts.length - MAX_FORECAST_ENTRIES).map((r) => cache.delete(r))
+    );
+  }
+}
+
 async function networkFirst(request) {
   const cache = await caches.open(CACHE);
   try {
     const fresh = await fetch(request);
-    if (fresh.ok || fresh.type === 'opaque') cache.put(request, fresh.clone());
+    if (fresh.ok || fresh.type === 'opaque') {
+      cache.put(request, fresh.clone());
+      if (new URL(request.url).hostname === 'api.open-meteo.com') pruneForecasts(cache);
+    }
     return fresh;
   } catch (err) {
     const hit = await cache.match(request, { ignoreSearch: request.mode === 'navigate' });
@@ -82,16 +100,27 @@ async function cacheFirst(request) {
   return fresh;
 }
 
+// Transient lookups (search-as-you-type geocoding, ZIP and reverse-geocode
+// probes) have no offline value — caching them only bloats the cache. Let
+// them pass straight through to the network.
+const PASSTHROUGH_HOSTS = [
+  'geocoding-api.open-meteo.com',
+  'api.zippopotam.us',
+  'api.bigdatacloud.net',
+];
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
+  if (PASSTHROUGH_HOSTS.includes(url.hostname)) return;
+
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(cacheFirst(req));
   } else {
-    // Same-origin shell and the weather/geocoding APIs both want
-    // fresh-when-online, last-known-good when offline.
+    // Same-origin shell and the forecast API both want fresh-when-online,
+    // last-known-good when offline.
     event.respondWith(networkFirst(req));
   }
 });

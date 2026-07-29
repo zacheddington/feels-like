@@ -47,6 +47,8 @@
     <form class="search" id="searchForm" role="search">
       <input id="searchInput" type="text" placeholder="city or ZIP code"
              autocomplete="off" spellcheck="false" enterkeyhint="search"
+             role="combobox" aria-autocomplete="list" aria-expanded="false"
+             aria-controls="suggestions" aria-haspopup="listbox"
              aria-label="Search for a city or ZIP code">
       <button type="submit" class="search-btn" aria-label="Search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -61,7 +63,8 @@
           <path d="M21 3.5L3.5 10.8l7.2 2.5 2.5 7.2z"/>
         </svg>
       </button>
-      <ul id="suggestions" class="suggestions" hidden></ul>
+      <ul id="suggestions" class="suggestions" role="listbox"
+          aria-label="Place suggestions" hidden></ul>
     </form>
   </div>
 

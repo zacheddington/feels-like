@@ -5,12 +5,10 @@
 // are labeled training data for tuning the formula (see CLAUDE.md,
 // "The feedback loop", for how to analyze them).
 //
-// Two destinations:
-//  1. A Google Form (preferred): set FEEDBACK_FORM.action and the field entry
-//     ids below, and submissions land silently in the connected Sheet.
-//     Wiring steps are in CLAUDE.md.
-//  2. Until the form is configured: opens a pre-filled email draft instead,
-//     so no feedback is lost in the meantime.
+// Submissions post silently to the Google Form configured below (responses
+// land in its linked Sheet — wiring steps in CLAUDE.md). If the action URL is
+// ever cleared, submissions fall back to a pre-filled email draft to
+// FALLBACK_EMAIL so no feedback is lost while re-wiring.
 
 import { computeFeelsLike } from './feelslike.js';
 
@@ -26,9 +24,11 @@ export const FEEDBACK_FORM = {
 const FALLBACK_EMAIL = 'zacheddington@gmail.com';
 
 let pending = null; // { snapshot, unit } for the currently open dialog
+let closeTimer;     // auto-close after a successful submit
 
 export function openFeedback(entry, unit) {
   if (!entry || !entry.data) return;
+  clearTimeout(closeTimer); // reopening fast shouldn't inherit the old auto-close
   const c = entry.data.current;
   const feel = computeFeelsLike({
     temp: c.temperature_2m,
@@ -132,7 +132,8 @@ export function initFeedback() {
     const status = document.getElementById('feedbackStatus');
     try {
       status.textContent = await submit(val);
-      setTimeout(() => dlg.close(), 2000);
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => dlg.close(), 2000);
     } catch {
       status.textContent = 'couldn’t send right now — try again in a moment';
     }
