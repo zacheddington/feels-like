@@ -152,6 +152,11 @@ static `:root` fallback in style.css). Three layers:
 **After ANY change to theme.js, run `node tools/audit-contrast.mjs`** — it
 sweeps ~28k palette combinations and exits non-zero on any floor violation.
 
+**Theme stability rule:** while a panel is loading (or errored), `applyMood`
+holds the current palette — the browser-local default sky applies ONLY in the
+true empty state (no panels at all). Without this, every search flashed the
+user's local golden-hour orange mid-transition. TESTING.md §3.3 guards it.
+
 To preview: `?mock=<scenario>&hour=<0–23>` steps the sky clock;
 scenarios carry the weather (e.g. `chill` is rain, `cold` is snow).
 `computePalette()` is pure (no DOM); `applyTheme()` applies it to CSS

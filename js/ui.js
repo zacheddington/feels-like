@@ -376,8 +376,13 @@ export function renderSuggestions(state) {
 
 function applyMood(state) {
   const primary = state.panels[0];
-  if (!primary || !primary.data) {
-    applyTheme(); // sky clock at the browser's local time, clear weather
+  // A place is loading (or errored): HOLD the current sky. Falling back to
+  // the browser-local default here made every search flash orange at golden
+  // hour before settling on the new city's palette. It also preserves the
+  // pre-paint palette restore on boot until real data arrives.
+  if (primary && !primary.data) return;
+  if (!primary) {
+    applyTheme(); // true empty state: sky clock at the browser's local time
     return;
   }
   const d = primary.data;

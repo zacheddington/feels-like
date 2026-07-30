@@ -235,6 +235,41 @@ Navigate to `/?mock=humid-heat&hour=13`, wait 1.5s, then run:
 
 ---
 
+### 3.3 — Theme holds steady while a new place loads
+
+Switching locations must never flash the browser-local default sky between
+the old and new palettes (at golden hour this showed as an orange blink on
+every search). Run on `/?mock=dry-heat` after it has rendered:
+
+```js
+(async () => {
+  const bg = () => document.documentElement.style.getPropertyValue('--bg').trim();
+  const before = bg();
+  const orig = window.fetch;
+  window.fetch = (url, opts) => (typeof url === 'string' && url.includes('/v1/forecast'))
+    ? orig(url, opts).then(r => new Promise(res => setTimeout(() => res(r), 2500)))
+    : orig(url, opts);
+  const inp = document.querySelector('#searchInput');
+  inp.value = 'Denver CO';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 2400));
+  document.querySelector('#suggestions li')?.click();
+  await new Promise(r => setTimeout(r, 900));           // mid-load: forecast delayed
+  const during = bg();
+  await new Promise(r => setTimeout(r, 4500));          // loaded
+  window.fetch = orig;
+  const loaded = /Denver/.test(document.querySelector('.place')?.textContent || '');
+  return {
+    heldDuringLoad: { pass: during === before, before, during },
+    newPlaceLoaded: { pass: loaded },
+  };
+})()
+```
+
+**Expected:** `heldDuringLoad.pass: true` — the background variable is
+byte-identical mid-load to what it was before the search (the new palette may
+apply only after data arrives) — and `newPlaceLoaded.pass: true`.
+
 ## 4. Mock scenarios — offline UI (no network needed)
 
 Mock mode renders the whole app from synthetic data, pinned to 3 PM by default.
@@ -1020,6 +1055,7 @@ Mark each PASS / FAIL / BLOCKED. **Deploy only if every row is PASS.**
 | 2.1  | Formula regression + mood + wind domain     |        |
 | 3.1  | Palette phases + contrast + weather tint    |        |
 | 3.2  | theme-color meta syncs to --bg              |        |
+| 3.3  | Theme holds steady during location change   |        |
 | 4.1  | All 6 mock scenarios render fully           |        |
 | 4.2  | Shade line shows in sun, hidden at night    |        |
 | 4.3  | Sky clock steps through the day (visual)    |        |
